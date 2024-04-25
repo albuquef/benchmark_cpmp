@@ -1,0 +1,6 @@
+http://www-usr.inf.ufsm.br/~stefanello/instances/CPMP/
+
+<- Euclidean distances
+Format --> 1st line: # of points # of medians
+Other lines:  X Y  co-ordinates of points,
+                    capacities and demands,
