@@ -132,6 +132,8 @@ def main():
     # # Output the list of filenames without extensions
     # print(file_names)
     # print(len(file_names))
+    
+    # # exit()
 
     # # Pattern to match digits after underscore at the end of the string
     # pattern = r'_(\d+)$'
@@ -183,7 +185,7 @@ def main():
     input_csv_file = "./data/PACA/points_coord.csv"
     location_identifiers = read_location_identifiers(f"{PATH_DATA}map_id_cust_loc.txt")
     locations, data = read_csv(input_csv_file, location_identifiers)
-    txt_file='arrond'
+    txt_file='epci'
     
     # Perform K-means clustering
     kmeans = perform_kmeans(data, n_clusters)
