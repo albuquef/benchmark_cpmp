@@ -29,7 +29,7 @@ def read_csv(csv_file, location_identifiers):
                 y = float(row['y'])
                 locations.append(location_identifiers[identif])
                 coordinates.append((x, y))
-    return locations, coordinates
+    return np.array(locations), np.array(coordinates)
 
 def read_location_identifiers(txt_file):
     location_identifiers = {}
@@ -62,7 +62,7 @@ def perform_kmeans(data, n_clusters):
     return kmeans
 
 # Function to plot clusters and boundaries
-def plot_clusters(data, kmeans):
+def plot_clusters(data, kmeans, title='K-Means Clustering', save_path='clusters_plot'):
     centroids = kmeans.cluster_centers_
     labels = kmeans.labels_
 
@@ -91,11 +91,17 @@ def plot_clusters(data, kmeans):
     # Plot the centroids
     # plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=200, color='red')
 
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('K-Means Clustering with Decision Boundaries')
+    plt.xlabel('coord X')
+    plt.ylabel('coord Y')
+    plt.title(title)  
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
+    # Save the figure
+    # plt.savefig('./plots/'+save_path+'_HQ.pdf', format='pdf', dpi=1200)
+    plt.savefig(save_path+'.pdf', format='pdf')
+    plt.savefig(save_path+'_Q.png', format='png', dpi=1200)
+    plt.savefig(save_path+'.png', format='png', dpi=300)
+    # plt.savefig('./plots/'+save_path+'.svg', format='svg', dpi=1200)
     plt.show()
 
 # Function to save points with cluster labels to CSV
@@ -167,31 +173,41 @@ def main():
     # exit()
     
     
-    group_number = 3
-    txt_file='p3038_600'
-    # group_number = 5
+    n_clusters = 20  # Change this to the desired number of clusters
+
+    # Literature plot clusters
+    # group_number = 3
+    # txt_file='p3038_600'
+    group_number = 5
     # txt_file='rl1304_010'
     # txt_file='pr2392_020'
-    # txt_file='fnl4461_0100'
-    
+    txt_file='fnl4461_0100'
     PATH_DATA=f'./data/Literature/group{group_number}/'
     input_txt_file = f"{PATH_DATA}loc_capacities_{txt_file}.txt"
-    
-    n_clusters = 18  # Change this to the desired number of clusters
-
     locations, data = read_data_txt(input_txt_file)
+    # Perform K-means clustering
+    kmeans = perform_kmeans(data, n_clusters)
+    # Plot clusters and boundaries
+    title = f'K-Means Clustering {txt_file}'
+    plot_clusters(data, kmeans, title, f'plots/plots_lit/clusters_plot_{txt_file}')
+    # Save points with cluster labels to txt
+    # output_txt_file = f"{PATH_DATA}loc_coverages_kmeans_{txt_file}.txt"    
+    # save_locations_with_clusters(locations, data, kmeans.labels_, output_txt_file)
+    # print(f"saved: loc_coverages_kmeans_{txt_file}")
+    exit()
+
     
     PATH_DATA="./data/PACA/"
     input_csv_file = "./data/PACA/points_coord.csv"
     location_identifiers = read_location_identifiers(f"{PATH_DATA}map_id_cust_loc.txt")
     locations, data = read_csv(input_csv_file, location_identifiers)
-    txt_file='epci'
-    
+    txt_file='commune'
     # Perform K-means clustering
     kmeans = perform_kmeans(data, n_clusters)
 
     # Plot clusters and boundaries
-    # plot_clusters(data, kmeans)
+    title = f'K-Means Clustering {txt_file} PACA'
+    plot_clusters(data, kmeans, title, f'clusters_plot_{txt_file}')
 
     # # Save points with cluster labels to CSV
     # output_csv_file_points = "points_with_clusters.csv"

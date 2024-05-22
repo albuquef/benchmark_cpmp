@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 # import geopandas as gpd
 # from shapely.geometry import Point
 
-def plot_points_Lit(file_path):
+def plot_points_Lit(file_path, instance_name):
     # with open(file_txt, 'r') as f:
     #     lines = f.readlines()
     #     lines = [line.strip() for line in lines]
@@ -23,7 +23,8 @@ def plot_points_Lit(file_path):
     plt.scatter(df['coord_x'], df['coord_y'], c='green', marker='o')
     plt.xlabel('coord_x')
     plt.ylabel('coord_y')
-    plt.title('Points from Literature')
+    plt.title(f'Points from {instance_name}')
+    plt.savefig(f'plots/plots_lit/points_plot_lit_{instance_name}.png')
     plt.show()
     
 def plot_points(csv_file, method='matplotlib', title='Points from CSV'):
@@ -68,4 +69,12 @@ def plot_points(csv_file, method='matplotlib', title='Points from CSV'):
     #     plt.show()
 
 # plot_points('./data/PACA/points_coord.csv', method='matplotlib', title='PACA region')
-plot_points_Lit('./data/Literature/group5/loc_capacities_fnl4461_0100.txt')
+# instance_name = 'p3038_600'
+# plot_points_Lit(f'./data/Literature/group3/loc_capacities_{instance_name}.txt', instance_name)
+# instance_name = 'rl1304_010'
+# instance_name = 'pr2392_020'
+instance_name = 'fnl4461_0100'
+plot_points_Lit(f'./data/Literature/group5/loc_capacities_{instance_name}.txt', instance_name)
+# plot_points_Lit('./data/Literature/group5/loc_capacities_rl1304_010.txt')
+# plot_points_Lit('./data/Literature/group5/loc_capacities_pr2392_020.txt')
+# plot_points_Lit('./data/Literature/group5/loc_capacities_fnl4461_0100.txt')
