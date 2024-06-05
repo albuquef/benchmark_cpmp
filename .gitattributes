@@ -1,1 +1,2 @@
 data/Literature/GB21/*.txt filter=lfs diff=lfs merge=lfs -text
+data/Literature/GB21/digits60000_100_784.txt filter=lfs diff=lfs merge=lfs -text
