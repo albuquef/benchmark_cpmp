@@ -310,15 +310,15 @@ def main():
     # exit()
     
     
-    n_clusters = 20  # Change this to the desired number of clusters
+    n_clusters = 100  # Change this to the desired number of clusters
 
     # Literature plot clusters
     # group_number = 3
     # txt_file='p3038_600'
     group_number = 5
     # txt_file='rl1304_010'
-    txt_file='pr2392_020'
-    # txt_file='fnl4461_0100'
+    # txt_file='pr2392_020'
+    txt_file='fnl4461_0100'
     PATH_DATA=f'./data/Literature/group{group_number}/'
     input_txt_file = f"{PATH_DATA}loc_capacities_{txt_file}.txt"
     locations, data = read_data_txt(input_txt_file)
@@ -340,14 +340,14 @@ def main():
     min_x, max_x = np.min(data[:, 0]), np.max(data[:, 0])
     min_y, max_y = np.min(data[:, 1]), np.max(data[:, 1])
     # Create the grid
-    # grid = create_grid(min_x, max_x, min_y, max_y, n_clusters)
+    grid = create_grid(min_x, max_x, min_y, max_y, n_clusters)
     # Create a grid with varying cell sizes
-    grid = create_varying_grid(min_x, max_x, min_y, max_y, data, n_clusters)
+    # grid = create_varying_grid(min_x, max_x, min_y, max_y, data, n_clusters) # not working yet 
     # Assign cluster labels to points based on grid cells
     labels = assign_cluster_labels(grid, data)
     # Plot the grid and points
     plot_grid_and_points(grid, data, labels)
-    output_txt_file = f"{PATH_DATA}loc_coverages_rand_grid_{txt_file}.txt" 
+    output_txt_file = f"{PATH_DATA}loc_coverages_grid_{txt_file}.txt" 
     # Save points with cluster labels to CSV
     save_points_with_clusters(data, labels, output_txt_file)
     # Save locations with cluster labels and coordinates to a text file
