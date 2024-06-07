@@ -20,6 +20,19 @@ def format_instance(PATH, filename, data):
 
 
 def format_distance_matrix(PATH, filename, data):
+
+    skip_filenames = [
+        "spain737_74_1.txt",
+        "spain737_74_2.txt",
+        "spain737_148_1.txt",
+        "spain737_148_2.txt"
+    ]
+    
+    # spain is not euclidian distance
+    if filename in skip_filenames:
+        print(f"Skipping {filename} as it is not euclidian distance.")
+        return
+
     distances = []
     for i in range(len(data)):
         for j in range(i+1, len(data)):
@@ -49,20 +62,24 @@ def euclidean_distance(point1, point2):
 
 
 
-PATH = "./data/group1/"
+# PATH = "./data/group1/"
+# # Generating filenames_g1 using a loop
+# filenames = [f"cpmp{i:02}.txt" for i in range(1, 21)]
+
+PATH = "./data/Literature/group4/"
 # Generating filenames_g1 using a loop
-filenames_g1 = [f"cpmp{i:02}.txt" for i in range(1, 21)]
+filenames = ["spain737_74_1.txt","spain737_74_2.txt","spain737_148_1.txt","spain737_148_2.txt"]
 
 
-PATH = "./data/Literature/GB21/"
-filenames_g6 = ["XMC10150_100.txt","XMC10150_1000.txt", "XMC10150_2000.txt","SRA104814_100.txt", "SRA104814_1000.txt", "SRA104814_2000.txt",\
-                "FNA52057_100.txt", "FNA52057_1000.txt", "FNA52057_2000.txt","LRA498378_100.txt", "LRA498378_1000.txt", "LRA498378_2000.txt"]
+# PATH = "./data/Literature/GB21/"
+# filenames = ["XMC10150_100.txt","XMC10150_1000.txt", "XMC10150_2000.txt","SRA104814_100.txt", "SRA104814_1000.txt", "SRA104814_2000.txt",\
+#                 "FNA52057_100.txt", "FNA52057_1000.txt", "FNA52057_2000.txt","LRA498378_100.txt", "LRA498378_1000.txt", "LRA498378_2000.txt"]
 # filenames_g6 = ["SRA104814_100.txt", "SRA104814_1000", "SRA104814_2000.txt"]
 # filenames_g6 = ["FNA52057_100.txt", "FNA52057_1000.txt", "FNA52057_2000.txt"]
 # filenames_g6 = ["LRA498378_100.txt", "LRA498378_1000.txt", "LRA498378_2000.txt"]
 
 # Loop through each filename
-for filename in filenames_g6:
+for filename in filenames:
     with open(os.path.join(PATH, filename), "r") as file:
         lines = file.readlines()
 
@@ -72,7 +89,7 @@ for filename in filenames_g6:
     # Extracting the coordinates, capacities, and demands for each point
     data = []
     for line in lines[1:]:
-        values = list(map(int, line.split()))
+        values = list(map(float, line.split()))
         point_data = {
             "x": values[0],
             "y": values[1],

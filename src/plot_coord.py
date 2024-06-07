@@ -73,8 +73,11 @@ def plot_points(csv_file, method='matplotlib', title='Points from CSV'):
 # plot_points_Lit(f'./data/Literature/group3/loc_capacities_{instance_name}.txt', instance_name)
 # instance_name = 'rl1304_010'
 # instance_name = 'pr2392_020'
-instance_name = 'fnl4461_0100'
-plot_points_Lit(f'./data/Literature/group5/loc_capacities_{instance_name}.txt', instance_name)
+# instance_name = 'fnl4461_0100'
+# plot_points_Lit(f'./data/Literature/group5/loc_capacities_{instance_name}.txt', instance_name)
 # plot_points_Lit('./data/Literature/group5/loc_capacities_rl1304_010.txt')
 # plot_points_Lit('./data/Literature/group5/loc_capacities_pr2392_020.txt')
 # plot_points_Lit('./data/Literature/group5/loc_capacities_fnl4461_0100.txt')
+
+instance_name = 'spain737_74_1'
+plot_points_Lit(f'./data/Literature/group4/loc_capacities_{instance_name}.txt', instance_name)

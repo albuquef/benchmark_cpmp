@@ -2,6 +2,8 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+import math
+from scipy.spatial.distance import cdist
 import os
 import re
 
@@ -104,6 +106,141 @@ def plot_clusters(data, kmeans, title='K-Means Clustering', save_path='clusters_
     # plt.savefig('./plots/'+save_path+'.svg', format='svg', dpi=1200)
     plt.show()
 
+
+
+
+# Function to create the grid
+def create_grid(min_x, max_x, min_y, max_y, k):
+    # Calculate the number of rows and columns needed
+    cols = math.ceil(math.sqrt(k))
+    rows = math.ceil(k / cols)
+    
+    # Calculate the step size for the grid
+    step_x = (max_x - min_x) / cols
+    step_y = (max_y - min_y) / rows
+    
+    # Generate grid points
+    x_points = np.arange(min_x, max_x, step_x)
+    y_points = np.arange(min_y, max_y, step_y)
+    
+    grid = []
+    
+    for i in range(rows):
+        for j in range(cols):
+            # Create a cell with (x_min, x_max, y_min, y_max)
+            x_min = min_x + j * step_x
+            x_max = x_min + step_x
+            y_min = min_y + i * step_y
+            y_max = y_min + step_y
+            
+            # Ensure the last cell aligns with the max boundaries
+            if x_max > max_x:
+                x_max = max_x
+            if y_max > max_y:
+                y_max = max_y
+            
+            grid.append(((x_min, x_max), (y_min, y_max)))
+    
+    return grid
+
+def create_varying_grid(min_x, max_x, min_y, max_y, data, k):
+    grid = []
+    total_area = (max_x - min_x) * (max_y - min_y)
+    target_cell_area = total_area / k
+
+    # Initialize the queue with the bounding box
+    queue = [((min_x, max_x), (min_y, max_y))]
+
+    while len(queue) > 0:
+        # Pop the top bounding box from the queue
+        (x_min, x_max), (y_min, y_max) = queue.pop(0)
+        
+        # Find the point closest to the center of the bounding box
+        cell_center = np.array([(x_min + x_max) / 2, (y_min + y_max) / 2])
+        distances = cdist([cell_center], data).squeeze()
+        closest_point_idx = np.argmin(distances)
+        closest_point = data[closest_point_idx]
+
+        # Check if the point is already assigned to a grid cell
+        assigned = False
+        for cell in grid:
+            if x_min <= closest_point[0] < x_max and y_min <= closest_point[1] < y_max:
+                assigned = True
+                break
+        
+        if not assigned:
+            # Add the grid cell to the grid
+            grid.append(((x_min, x_max), (y_min, y_max)))
+
+            # Subdivide the bounding box into four smaller cells
+            x_mid = (x_min + x_max) / 2
+            y_mid = (y_min + y_max) / 2
+            queue.append(((x_min, x_mid), (y_min, y_mid)))  # Top-left
+            queue.append(((x_mid, x_max), (y_min, y_mid)))  # Top-right
+            queue.append(((x_min, x_mid), (y_mid, y_max)))  # Bottom-left
+            queue.append(((x_mid, x_max), (y_mid, y_max)))  # Bottom-right
+
+    return grid
+# Function to assign cluster labels to points based on grid cells
+def assign_cluster_labels(grid, data):
+    labels = np.zeros(len(data), dtype=int)
+    
+    for idx, (x, y) in enumerate(data):
+        for cluster_label, ((x_min, x_max), (y_min, y_max)) in enumerate(grid):
+            if x_min <= x < x_max and y_min <= y < y_max:
+                labels[idx] = cluster_label
+                break
+    
+    return labels
+
+# Function to plot the grid and points
+def plot_grid_and_points(grid, data, labels):
+    fig, ax = plt.subplots()
+    
+    # Generate a colormap with a unique color for each grid cell
+    cmap = plt.cm.get_cmap('tab20', len(grid))
+    colors = cmap(range(len(grid)))
+    
+    # Plot the grid with different colors for each cell
+    for idx, cell in enumerate(grid):
+        (x_min, x_max), (y_min, y_max) = cell
+        rect = plt.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, color=colors[idx], alpha=0.5)
+        ax.add_patch(rect)
+    
+    # Plot the points with their cluster labels
+    scatter = ax.scatter(data[:, 0], data[:, 1], c=labels, cmap=cmap, edgecolor='black')
+    legend1 = ax.legend(*scatter.legend_elements(), title="Clusters")
+    ax.add_artist(legend1)
+    
+    plt.xlim(grid[0][0][0], grid[-1][0][1])
+    plt.ylim(grid[0][1][0], grid[-1][1][1])
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.show()
+
+# # Function to plot the grid and points
+# def plot_grid_and_points(grid, data, labels, k):
+#     plt.figure(figsize=(10, 8))
+    
+#     # Generate a colormap with a unique color for each grid cell
+#     cmap = plt.cm.get_cmap('tab20', k)
+#     colors = cmap(range(k))
+    
+#     # Plot the grid with different colors for each cell
+#     for idx, cell in enumerate(grid):
+#         (x_min, x_max), (y_min, y_max) = cell
+#         rect = plt.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, color=colors[idx % k], alpha=0.5)
+#         plt.gca().add_patch(rect)
+    
+#     # Plot the points with their cluster labels
+#     for idx in range(k):
+#         cluster_points = data[labels == idx]
+#         plt.scatter(cluster_points[:, 0], cluster_points[:, 1], color=colors[idx % k], label=f'Cluster {idx+1}', edgecolor='black')
+    
+#     plt.legend()
+#     plt.gca().set_aspect('equal', adjustable='box')
+#     plt.show()
+
+
 # Function to save points with cluster labels to CSV
 def save_points_with_clusters(data, labels, output_csv_file):
     with open(output_csv_file, 'w', newline='') as csvfile:
@@ -180,20 +317,42 @@ def main():
     # txt_file='p3038_600'
     group_number = 5
     # txt_file='rl1304_010'
-    # txt_file='pr2392_020'
-    txt_file='fnl4461_0100'
+    txt_file='pr2392_020'
+    # txt_file='fnl4461_0100'
     PATH_DATA=f'./data/Literature/group{group_number}/'
     input_txt_file = f"{PATH_DATA}loc_capacities_{txt_file}.txt"
     locations, data = read_data_txt(input_txt_file)
+    
+    
     # Perform K-means clustering
-    kmeans = perform_kmeans(data, n_clusters)
+    # kmeans = perform_kmeans(data, n_clusters)
     # Plot clusters and boundaries
-    title = f'K-Means Clustering {txt_file}'
-    plot_clusters(data, kmeans, title, f'plots/plots_lit/clusters_plot_{txt_file}')
+    # title = f'K-Means Clustering {txt_file}'
+    # plot_clusters(data, kmeans, title, f'plots/plots_lit/clusters_plot_{txt_file}')
     # Save points with cluster labels to txt
     # output_txt_file = f"{PATH_DATA}loc_coverages_kmeans_{txt_file}.txt"    
     # save_locations_with_clusters(locations, data, kmeans.labels_, output_txt_file)
     # print(f"saved: loc_coverages_kmeans_{txt_file}")
+
+
+    
+    # Determine the bounding box of the points
+    min_x, max_x = np.min(data[:, 0]), np.max(data[:, 0])
+    min_y, max_y = np.min(data[:, 1]), np.max(data[:, 1])
+    # Create the grid
+    # grid = create_grid(min_x, max_x, min_y, max_y, n_clusters)
+    # Create a grid with varying cell sizes
+    grid = create_varying_grid(min_x, max_x, min_y, max_y, data, n_clusters)
+    # Assign cluster labels to points based on grid cells
+    labels = assign_cluster_labels(grid, data)
+    # Plot the grid and points
+    plot_grid_and_points(grid, data, labels)
+    output_txt_file = f"{PATH_DATA}loc_coverages_rand_grid_{txt_file}.txt" 
+    # Save points with cluster labels to CSV
+    save_points_with_clusters(data, labels, output_txt_file)
+    # Save locations with cluster labels and coordinates to a text file
+    save_locations_with_clusters(locations, data, labels, output_txt_file)
+
     exit()
 
     
