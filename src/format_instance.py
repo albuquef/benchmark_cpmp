@@ -46,6 +46,45 @@ def format_distance_matrix(PATH, filename, data):
             output_file.write(f"{loc1} {loc2} {dist}\n")
     print(f"File {output_filename} created successfully.")
 
+
+def format_spain_dist_matrix(path,filename):
+
+    with open(path+filename, 'r') as file:
+        lines = file.readlines()
+
+    # Convert the lines into a list of integers
+    numbers = [int(line.strip()) for line in lines]
+
+    # Determine the size of the square matrix
+    size = int(len(numbers) ** 0.5)
+
+    # Check if the number of elements forms a perfect square
+    if size * size != len(numbers):
+        raise ValueError("The number of elements is not a perfect square, cannot form a square matrix.")
+
+    # Reshape the list into a square matrix
+    matrix = [numbers[i*size:(i+1)*size] for i in range(size)]
+
+    # Create output filename and path with .txt extension
+    output_filename = f"dist_matrix_{os.path.basename(filename).replace('.grd', '.txt')}"
+    output_filepath = os.path.join(path, output_filename)
+
+    # Write the distances to the output file
+    with open(output_filepath, "w") as output_file:
+        output_file.write("customer location distance\n")
+        for i in range(size):
+            for j in range(size):
+                loc1, loc2, dist = i + 1, j + 1, matrix[i][j]
+                output_file.write(f"{loc1} {loc2} {dist}\n")
+
+    print(f"File {output_filename} created successfully.")
+
+
+
+
+
+
+
 def plot_points(x_coordinates, y_coordinates):
     plt.figure(figsize=(8, 6))
     plt.scatter(x_coordinates, y_coordinates, color='blue', label='Points')
@@ -68,8 +107,8 @@ def euclidean_distance(point1, point2):
 
 PATH = "./data/Literature/group4/"
 # Generating filenames_g1 using a loop
-filenames = ["spain737_74_1.txt","spain737_74_2.txt","spain737_148_1.txt","spain737_148_2.txt"]
-
+# filenames = ["spain737_74_1.txt","spain737_74_2.txt","spain737_148_1.txt","spain737_148_2.txt"]
+filenames = ["spain737_74_1.txt"]
 
 # PATH = "./data/Literature/GB21/"
 # filenames = ["XMC10150_100.txt","XMC10150_1000.txt", "XMC10150_2000.txt","SRA104814_100.txt", "SRA104814_1000.txt", "SRA104814_2000.txt",\
@@ -102,8 +141,13 @@ for filename in filenames:
     print("File:", filename)
     print("Number of Points:", num_points)
     print("Number of Medians:", num_medians)
-    format_instance(PATH, filename, data)
+    # format_instance(PATH, filename, data)
+    # format_spain_dist_matrix(PATH,filename)
     # format_distance_matrix(PATH, filename, data)
+
+    PATH = "./data/Literature/group4/"  
+    filename = "spain.grd"
+    format_spain_dist_matrix(PATH,filename)
 
     # Unpacking the data into separate lists for x and y coordinates
     x_coordinates = [point["x"] for point in data]
