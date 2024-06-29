@@ -21,111 +21,255 @@ def extract_coordinates(idcar):
     else:
         return None, None
 
-# Apply the function to extract coordinates and create new columns in the DataFrame
-df_points_pop_paca['easting'], df_points_pop_paca['northing'] = zip(*df_points_pop_paca['idcar_1km'].apply(extract_coordinates))
+def load_population_data(filepath):
+    """Loads population data and extracts coordinates."""
+    df = pd.read_csv(filepath)
+    df['easting'], df['northing'] = zip(*df['idcar_1km'].apply(extract_coordinates))
+    df = df.dropna(subset=['easting', 'northing'])
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['easting'], df['northing']))
+    gdf.set_crs(epsg=3035, inplace=True)
+    return gdf
 
-# Drop rows where coordinates couldn't be extracted
-df_points_pop_paca = df_points_pop_paca.dropna(subset=['easting', 'northing'])
+def load_grid_points_data(filepath):
+    """Loads grid data and converts CRS."""
+    df = pd.read_csv(filepath, low_memory=False)
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['longitude'], df['latitude']), crs='ESRI:102100') # coordinates in WGS 84
+    gdf = gdf.to_crs(epsg=3035) # Convert to EPSG:3035
+    return gdf
 
-# Create a GeoDataFrame for the first dataset
-gdf_points_pop_paca = gpd.GeoDataFrame(df_points_pop_paca, geometry=gpd.points_from_xy(df_points_pop_paca.easting, df_points_pop_paca.northing))
+def calculate_weights(gdf_pop, gdf_grid):
+    """Performs spatial join to find nearest neighbors and calculate weights."""
+    print('-' * 50)
+    print("[INFO] Calculating weights...")
 
-# Set the coordinate reference system (CRS) to the appropriate CRS (EPSG:3035)
-gdf_points_pop_paca.set_crs(epsg=3035, inplace=True)
+    gdf_grid['weight'] = 0.0  # Ensure weight column is of type float
+    gdf_pop_coords = list(zip(gdf_pop.geometry.x, gdf_pop.geometry.y))
+    gdf_grid_coords = list(zip(gdf_grid.geometry.x, gdf_grid.geometry.y))
+    
+    nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(gdf_grid_coords)
+    distances, indices = nn.kneighbors(gdf_pop_coords)
+    gdf_pop['closest_idx'] = indices.flatten()
+    
+    for idx in range(len(gdf_grid)):
+        gdf_grid.at[idx, 'weight'] = gdf_pop[gdf_pop['closest_idx'] == idx]['ind'].sum()
+    
+    # compare the sum of ind column with the sum of weight column
+    sum_ind = gdf_pop['ind'].sum()
+    sum_weight = gdf_grid['weight'].sum()
+    
+    if sum_ind == sum_weight:
+        print(f"The sums of the weights are equal: {sum_ind}.")
+    else:
+        print("[WARN] The sums of the weights are not equal.")
+        print(f"Sum of 'ind' pop: {sum_ind}")
+        print(f"Sum of 'weight' grid: {sum_weight}")
+        
+    print('-' * 50)
+    
+    return gdf_grid
+
+def filter_weights(gdf_grid, k):
+    """Eliminates points with zero weight and transfers weights smaller than k to the nearest non-zero point."""
+    print('-' * 50)
+    print(f"[INFO] Filtering points with zero weight and transferring weights smaller than {k}...")
+    print(f"Number of elements before remove the zeros weights: {len(gdf_grid)}")
+    
+    # Initialize color column
+    gdf_grid['color'] = 'green'
+    # Separate points with zero weight for later plotting
+    zero_weight_points = gdf_grid[gdf_grid['weight'] == 0].copy()
+    zero_weight_points['color'] = 'red'
+    print(f'Number of elements with zero weight: {len(gdf_grid[gdf_grid["weight"] == 0])}')
+    
+    # Filter out points with zero weight
+    gdf_grid = gdf_grid[gdf_grid['weight'] != 0].copy()
+    
+    # Identify points with weights smaller than k
+    small_weight_mask = gdf_grid['weight'] < k
+    large_weight_mask = gdf_grid['weight'] >= k
+    
+    small_weight_points = gdf_grid[small_weight_mask]
+    large_weight_points = gdf_grid[large_weight_mask]
+    
+    if not small_weight_points.empty and not large_weight_points.empty:
+        # Get coordinates for small and large weight points
+        small_weight_coords = list(zip(small_weight_points.geometry.x, small_weight_points.geometry.y))
+        large_weight_coords = list(zip(large_weight_points.geometry.x, large_weight_points.geometry.y))
+        
+        # Find the nearest large weight point for each small weight point
+        nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(large_weight_coords)
+        distances, indices = nn.kneighbors(small_weight_coords)
+        
+        # Transfer small weights to the nearest large weight point
+        for i, idx in enumerate(small_weight_points.index):
+            nearest_large_idx = large_weight_points.index[indices[i][0]]
+            gdf_grid.at[nearest_large_idx, 'weight'] += gdf_grid.at[idx, 'weight']
+            gdf_grid.at[idx, 'weight'] = 0  # Set small weight to zero after transfer
+        
+            # Identify and separate points that now have zero weight after transfer
+        transferred_zero_weight_points = gdf_grid[gdf_grid['weight'] == 0].copy()
+        transferred_zero_weight_points['color'] = 'red'
+        
+        # Combine both sets of zero-weight points
+        zero_weight_points = zero_weight_points.append(transferred_zero_weight_points)
+        
+        
+        # Remove points that now have zero weight after transfer
+        gdf_grid = gdf_grid[gdf_grid['weight'] != 0]
+    
+    
+    # Print how many ellement before and now
+    print(f"Number of elements before filtering: {len(gdf_grid) + len(small_weight_points)}")
+    print(f"Number of elements after filtering: {len(gdf_grid)}")
+    print(f'Number of elements removed in total: {len(small_weight_points) + len(transferred_zero_weight_points)}')   
+    print('-' * 50) 
+    
+    create_plot = True
+    # Plotting
+    if create_plot:
+        fig, ax = plt.subplots()
+        gdf_grid[gdf_grid['color'] == 'green'].plot(ax=ax, color='green', label=f'Remaining (size: {len(gdf_grid)})')
+        if not zero_weight_points.empty:
+            zero_weight_points.plot(ax=ax, color='red', label=f'Removed (size: {len(zero_weight_points)})')
+        plt.legend()
+        plt.title(f"Grid points with the filter to reallocate weights smaller than {k}") 
+        plt.show()
+    
+    return gdf_grid
+
+def compare_grid_with_old_dataset(gdf_grid, gdf_old_dataset):
+    print('-' * 50)
+    print("[INFO] Comparing the new dataset with the old one...")
+    print(f"Number of elements in the new dataset: {len(gdf_grid)}")
+    print(f"Number of elements in the old dataset: {len(gdf_old_dataset)}")
+    # compare dist max min avg and std of the two datasets
+    print('New dataset:')
+    print(f"Sum of 'weight' column in the new dataset: {gdf_grid['weight'].sum()}")
+    print(f"Max value in the 'weight' column of the new dataset: {gdf_grid['weight'].max()}")
+    print(f"Min value in the 'weight' column of the new dataset: {gdf_grid['weight'].min()}")
+    print(f"Mean value in the 'weight' column of the new dataset: {gdf_grid['weight'].mean()}")
+    print(f"Standard deviation of the 'weight' column of the new dataset: {gdf_grid['weight'].std()}")
+    print('Old dataset:')
+    print(f"Sum of 'weight' column in the old dataset: {gdf_old_dataset['weight'].sum()}")
+    print(f"Max value in the 'weight' column of the old dataset: {gdf_old_dataset['weight'].max()}")
+    print(f"Min value in the 'weight' column of the old dataset: {gdf_old_dataset['weight'].min()}")
+    print(f"Mean value in the 'weight' column of the old dataset: {gdf_old_dataset['weight'].mean()}")
+    print(f"Standard deviation of the 'weight' column of the old dataset: {gdf_old_dataset['weight'].std()}")
+    
+    create_plot = True  
+    if create_plot:
+        # compare the histogram and heatmap of the two datasets
+        fig, ax = plt.subplots(1, 1, figsize=(20, 10))
+        gdf_grid['weight'].plot(kind='hist', bins=5, alpha=0.5, label=f'new dataset ({len(gdf_grid)})')
+        gdf_old_dataset['weight'].plot(kind='hist', bins=5, alpha=0.5, label=f'old dataset ({len(gdf_old_dataset)})')
+        plt.title("Distribution of Weights")
+        plt.xlabel("Weight")
+        plt.ylabel("Frequency")
+        plt.legend()
+        plt.show()
+        
+        fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+        gdf_grid.plot(ax=ax[0], column='weight', legend=True, legend_kwds={'label': "Weight", 'orientation': "horizontal"})
+        gdf_old_dataset.plot(ax=ax[1], column='weight', legend=True, legend_kwds={'label': "Weight", 'orientation': "horizontal"})
+        ax[0].set_title(f"Heat Map of Grid Population (new dataset)\nnum elements= {len(gdf_grid)}, sum = {gdf_grid['weight'].sum()}")
+        ax[0].set_xlabel("Easting")
+        ax[0].set_ylabel("Northing")
+        ax[1].set_title(f"Heat Map of Grid Population (old dataset)\nnum elements={len(gdf_old_dataset)}  , sum wi= {gdf_old_dataset['weight'].sum()}")
+        ax[1].set_xlabel("Easting")
+        ax[1].set_ylabel("Northing")
+        plt.show()
 
 
-# Create a GeoDataFrame for the second dataset with initial CRS as EPSG:4326 (WGS 84)
-gdf_points_grid_5km = gpd.GeoDataFrame(df_points_grid_5km, geometry=gpd.points_from_xy(df_points_grid_5km.longitude, df_points_grid_5km.latitude), crs='ESRI:102100')
-
-# Convert the CRS to EPSG:3035
-gdf_points_grid_5km = gdf_points_grid_5km.to_crs(epsg=3035)
-
-# Perform a spatial join to associate points in df_points_pop_paca with the closest point in df_points_grid_5km
-gdf_points_grid_5km['weight'] = 0  # Initialize the 'weight' column
-
-# Extract x and y coordinates
-gdf_points_pop_paca_coords = list(zip(gdf_points_pop_paca.geometry.x, gdf_points_pop_paca.geometry.y))
-gdf_points_grid_5km_coords = list(zip(gdf_points_grid_5km.geometry.x, gdf_points_grid_5km.geometry.y))
-
-# Use NearestNeighbors to find the nearest point in gdf_points_grid_5km for each point in gdf_points_pop_paca
-nn = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(gdf_points_grid_5km_coords)
-distances, indices = nn.kneighbors(gdf_points_pop_paca_coords)
-
-# Add the closest point indices to gdf_points_pop_paca
-gdf_points_pop_paca['closest_idx'] = indices.flatten()
-
-# Sum the 'ind' values for each point in gdf_points_grid_5km
-for idx in range(len(gdf_points_grid_5km)):
-    gdf_points_grid_5km.at[idx, 'weight'] = gdf_points_pop_paca[gdf_points_pop_paca['closest_idx'] == idx]['ind'].sum()
-
-# Plot both sets of points on the same map
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-gdf_points_pop_paca.plot(ax=ax, marker='o', color='red', markersize=5, label='Dataset 1')
-gdf_points_grid_5km.plot(ax=ax, marker='x', color='blue', markersize=5, label='Dataset 2')
-plt.title("Plot of Points from Both Datasets")
-plt.xlabel("Easting")
-plt.ylabel("Northing")
-plt.legend()
-plt.show()
+    print('-' * 50)
 
 
-# count the number of zeros in the 'weight' column
-num_zeros = (gdf_points_grid_5km['weight'] == 0).sum()
-print(f"Number of zeros in the 'weight' column: {num_zeros}")
-# number of non-zero values in the 'weight' column
-num_non_zeros = (gdf_points_grid_5km['weight'] != 0).sum()
-print(f"Number of non-zero values in the 'weight' column: {num_non_zeros}")
+def plot_pop_and_grid_points(gdf_pop, gdf_grid):
+    
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    gdf_pop.plot(ax=ax, marker='x', color='blue', markersize=5, label=f'Population (size: {gdf_pop.shape[0]})')
+    gdf_grid.plot(ax=ax, marker='o', color='green', markersize=10, label=f'Grid points (size: {gdf_grid.shape[0]})')
+    plt.title("Plot of Points from Both Datasets")
+    plt.xlabel("Easting")
+    plt.ylabel("Northing")
+    plt.legend()
+    plt.show()
+    
+    # """Plots datasets side by side."""
+    # fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+    # gdf_grid.plot(ax=ax[0], marker='x', color='blue', markersize=5, label='Grid')
+    # gdf_pop.plot(ax=ax[1], marker='o', color='red', markersize=5, label='Population')
+    # ax[0].set_title("Grid Points")
+    # ax[0].set_xlabel("Easting")
+    # ax[0].set_ylabel("Northing")
+    # ax[1].set_title("Population Points")
+    # ax[1].set_xlabel("Easting")
+    # ax[1].set_ylabel("Northing")
+    # plt.show()
+
+def plot_heatmap_grid_points(gdf_grid):
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    gdf_grid.plot(ax=ax, column='weight', legend=True, legend_kwds={'label': "Weight", 'orientation': "horizontal"})
+    plt.title("Heat Map of Grid Points with Weights")
+    plt.xlabel("Easting")
+    plt.ylabel("Northing")
+    plt.show()
+
+def create_final_table_instance(gdf_grid):
+    # create one file txt with 4 columns:id, weight, coord_x, coord_y, fid
+    filename = './outputs/PACA_2024/cust_weights_2024.txt'
+
+    print('-' * 50)
+    print(f"[INFO] Creating final table instance in {filename}...")
+    
+    
+    # print columns names  of df_grid
+    with open(filename, 'w') as f:
+        # first line with the columns names
+        f.write("customer weight coord_x coord_y fid\n")
+        for idx, row in gdf_grid.iterrows():
+            f.write(f"{idx} {row['weight']} {row['geometry'].x} {row['geometry'].y} {row['fid']}\n")
+
+    
+    print('-' * 50)
+    
+    
+
+gdf_points_pop_paca = load_population_data('data/data_qgis/data_instance_paca/points_population_1km_paca_table.csv')
+gdf_points_grid_5km = load_grid_points_data('data/data_qgis/data_instance_paca/points_grid_5km_paca_table.csv')
+gdf_points_grid_5km = calculate_weights(gdf_points_pop_paca, gdf_points_grid_5km)
+plot_pop_and_grid_points(gdf_points_pop_paca, gdf_points_grid_5km)
+
+gdf_points_grid_5km = filter_weights(gdf_points_grid_5km, 5) # Filter weights smaller than k and remove points with zero weight
+plot_heatmap_grid_points(gdf_points_grid_5km)
 
 
-# compare the sum of ind column with the sum of weight column
-sum_ind = gdf_points_pop_paca['ind'].sum()
-sum_weight = gdf_points_grid_5km['weight'].sum()
-print(f"Sum of 'ind' column: {sum_ind}")
-print(f"Sum of 'weight' column: {sum_weight}")
-if sum_ind == sum_weight:
-    print("The sums are equal.")
-else:
-    print("The sums are not equal.")
+create_final_table_instance(gdf_points_grid_5km)
 
 
-# change the color the points with zero weight
-gdf_points_grid_5km['color'] = 'green'
-gdf_points_grid_5km.loc[gdf_points_grid_5km['weight'] == 0, 'color'] = 'red'
-# plot the points with different colors
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-gdf_points_pop_paca.plot(ax=ax, marker='o', color='red', markersize=5, label='Dataset 1')
-gdf_points_grid_5km.plot(ax=ax, marker='x', color=gdf_points_grid_5km['color'], markersize=5, label='Dataset 2')
-plt.title("Plot of Points from Both Datasets")
-plt.xlabel("Easting")
-plt.ylabel("Northing")
-plt.legend()
-plt.show()
 
-# eliminate the points with zero weight
-gdf_points_grid_5km = gdf_points_grid_5km[gdf_points_grid_5km['weight'] != 0]
+#  -----    compare with old dataset ------
+df_cust_weights = pd.read_csv('data/PACA/cust_weights.txt', delim_whitespace=True, names=['customer', 'weight'])
+df_map_id_cust_loc = pd.read_csv('data/PACA/map_id_cust_loc.txt', delim_whitespace=True, names=['id', 'identif'])
+df_locations = pd.read_csv('data/PACA/locations_paca_2017_coord.csv')
+
+# Ensure that 'identif' columns are of the same type (string)
+df_map_id_cust_loc['identif'] = df_map_id_cust_loc['identif'].astype(str)
+df_locations['identif'] = df_locations['identif'].astype(str)
+
+# Merge the DataFrames to associate weights with coordinates
+df_merged = pd.merge(df_map_id_cust_loc, df_cust_weights, left_on='id', right_on='customer')
+df_old_dataset = pd.merge(df_merged, df_locations, left_on='identif', right_on='identif')
+# convert gdf_final['weight'] to float
+df_old_dataset['weight'] = df_old_dataset['weight'].astype(float)
+
+# Create a GeoDataFrame with the coordinates and weights in WGS 84 (EPSG:4326)
+df_old_dataset = gpd.GeoDataFrame(df_old_dataset, geometry=gpd.points_from_xy(df_old_dataset.x, df_old_dataset.y), crs='EPSG:3035')
+compare_grid_with_old_dataset(gdf_points_grid_5km, df_old_dataset)
 
 
-# print max min mean stddev of the 'weight' column
-print(f"Max value in the 'weight' column: {gdf_points_grid_5km['weight'].max()}")
-print(f"Min value in the 'weight' column: {gdf_points_grid_5km['weight'].min()}")
-print(f"Mean value in the 'weight' column: {gdf_points_grid_5km['weight'].mean()}")
-print(f"Standard deviation of the 'weight' column: {gdf_points_grid_5km['weight'].std()}")
 
-# plot graphic dist of weight with better visualization
-gdf_points_grid_5km['weight'].plot(kind='hist', bins=5)
-plt.title("Distribution of Weights")
-plt.xlabel("Weight")
-plt.ylabel("Frequency")
-plt.show()
 
-# plot the heat map of the df_points_grid_5km using the 'weight' column
-fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-gdf_points_grid_5km.plot(ax=ax, column='weight', legend=True, legend_kwds={'label': "Weight", 'orientation': "horizontal"})
-plt.title("Heat Map of Points with Weights")
-plt.xlabel("Easting")
-plt.ylabel("Northing")
-plt.show()
-
+exit()
 
 # Read the tables into DataFrames
 df_cust_weights = pd.read_csv('data/PACA/cust_weights.txt', delim_whitespace=True, names=['customer', 'weight'])

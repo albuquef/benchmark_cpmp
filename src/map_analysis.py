@@ -38,7 +38,7 @@ def extract_coordinates(coord_string):
 
 
 # Read the CSV file
-df = pd.read_csv('/home/falbuquerque/pop_paca_1km.csv')
+df = pd.read_csv('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/data_Felipe26_06/carreaux_1km_PACA.csv')
 
 
 # Apply the function to the DataFrame
@@ -54,11 +54,16 @@ geometry = [Point(xy) for xy in zip(df['easting'], df['northing'])]
 gdf = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
 
 # # Plot the points
-# gdf.plot(marker='o', color='red', markersize=5)
-# plt.title(f'Points from CSV {gdf.shape}')
-# plt.xlabel('Easting')
-# plt.ylabel('Northing')
-# plt.show()
+gdf.plot(marker='o', color='red', markersize=5)
+plt.title(f'Points from CSV {gdf.shape}')
+plt.xlabel('Easting')
+plt.ylabel('Northing')
+plt.show()
+
+exit()
+
+#################################################################################################
+
 
 # Define boundaries for the grid (example values, adjust as needed)
 min_easting = gdf['easting'].min()
@@ -67,8 +72,59 @@ min_northing = gdf['northing'].min()
 max_northing = gdf['northing'].max()
 
 # Define grid cell dimensions (width and height in meters)
-cell_width = 1000
-cell_height = 1000
+cell_width = 5000
+cell_height = 5000
+
+# Create grid cells as polygons
+grid_cells = []
+for x in range(int(min_easting), int(max_easting), cell_width):
+    for y in range(int(min_northing), int(max_northing), cell_height):
+        polygon = Polygon([
+            (x, y),
+            (x + cell_width, y),
+            (x + cell_width, y + cell_height),
+            (x, y + cell_height)
+        ])
+        grid_cells.append(polygon)
+
+# Create GeoDataFrame for grid cells
+grid_gdf = gpd.GeoDataFrame({'geometry': grid_cells}, crs="EPSG:3035")
+
+# Plotting
+fig, ax = plt.subplots(figsize=(10, 8))
+gdf.plot(ax=ax, marker='o', color='red', markersize=50, label='Points')
+grid_gdf.plot(ax=ax, edgecolor='blue', facecolor='none', linewidth=0.5, label='Grid')
+plt.title('Points with Custom Grid')
+plt.xlabel('Easting')
+plt.ylabel('Northing')
+plt.legend()
+plt.show()
+
+
+
+exit()
+
+
+
+
+
+
+
+
+
+
+
+#######################################################################################################
+
+# Define boundaries for the grid (example values, adjust as needed)
+min_easting = gdf['easting'].min()
+max_easting = gdf['easting'].max()
+min_northing = gdf['northing'].min()
+max_northing = gdf['northing'].max()
+
+# Define grid cell dimensions (width and height in meters)
+cell_width = 5000
+cell_height = 5000
 
 # Create grid cells as polygons
 # Create grid cells as polygons and calculate points inside each grid
@@ -88,7 +144,7 @@ for x in range(int(min_easting), int(max_easting), cell_width):
 # Create GeoDataFrame for grid cells
 grid_gdf = gpd.GeoDataFrame(geometry=[gc[0] for gc in grid_cells], crs="EPSG:3035")
 grid_gdf['points_inside'] = [gc[1] for gc in grid_cells]
-# grid_gdf['centroid'] = [gc[2] for gc in grid_cells]
+grid_gdf['centroid'] = [gc[2] for gc in grid_cells]
 
 # Calculate central point only if there are points inside any grid cell
 if grid_gdf['points_inside'].sum() > 0:
@@ -103,11 +159,11 @@ num_grids = len(grid_gdf)
 
 # Plotting
 fig, ax = plt.subplots(figsize=(10, 8))
-# gdf.plot(ax=ax, marker='o', color='red', markersize=50, label='Points')
-# grid_gdf.plot(ax=ax, column='points_inside', cmap='Blues', edgecolor='blue', linewidth=0.5, legend=True)
-grid_gdf.plot(ax=ax, edgecolor='blue', facecolor='none', linewidth=0.5, label='Grid')
-# for idx, row in grid_gdf.iterrows():
-#     ax.scatter(row['centroid'].x, row['centroid'].y, color='green', s=50)
+gdf.plot(ax=ax, marker='o', color='red', markersize=50, label='Points')
+grid_gdf.plot(ax=ax, column='points_inside', cmap='Blues', edgecolor='blue', linewidth=0.5, legend=True)
+# grid_gdf.plot(ax=ax, edgecolor='blue', facecolor='none', linewidth=0.5, label='Grid')
+for idx, row in grid_gdf.iterrows():
+    ax.scatter(row['centroid'].x, row['centroid'].y, color='green', s=50)
 # if central_point:
 #     ax.scatter(central_point_x, central_point_y, color='green', s=100, label='Central Point')
 plt.title(f'Points with Custom Grid - {num_grids} grids')
