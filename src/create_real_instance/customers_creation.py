@@ -216,7 +216,7 @@ def plot_heatmap_grid_points(gdf_grid):
 
 def create_final_table_instance(gdf_grid):
     # create one file txt with 4 columns:id, weight, coord_x, coord_y, fid
-    filename = './outputs/PACA_2024/cust_weights_2024.txt'
+    filename = './outputs/PACA_Jun2024/cust_weights_Jun2024.txt'
 
     print('-' * 50)
     print(f"[INFO] Creating final table instance in {filename}...")
