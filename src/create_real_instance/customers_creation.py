@@ -84,6 +84,7 @@ def filter_weights(gdf_grid, k):
     # Filter out points with zero weight
     gdf_grid = gdf_grid[gdf_grid['weight'] != 0].copy()
     
+    
     # Identify points with weights smaller than k
     small_weight_mask = gdf_grid['weight'] < k
     large_weight_mask = gdf_grid['weight'] >= k
@@ -119,9 +120,10 @@ def filter_weights(gdf_grid, k):
     
     
     # Print how many ellement before and now
-    print(f"Number of elements before filtering: {len(gdf_grid) + len(small_weight_points)}")
-    print(f"Number of elements after filtering: {len(gdf_grid)}")
-    print(f'Number of elements removed in total: {len(small_weight_points) + len(transferred_zero_weight_points)}')   
+    print(f"Number of elements before: {len(gdf_grid) + len(small_weight_points)}")
+    print(f"Number of elements after filtering less than {k}: {len(gdf_grid)}")
+    if k != 0:
+        print(f'Number of elements removed in total: {len(small_weight_points) + len(transferred_zero_weight_points)}')   
     print('-' * 50) 
     
     create_plot = True
@@ -138,6 +140,7 @@ def filter_weights(gdf_grid, k):
     return gdf_grid
 
 def compare_grid_with_old_dataset(gdf_grid, gdf_old_dataset):
+    
     print('-' * 50)
     print("[INFO] Comparing the new dataset with the old one...")
     print(f"Number of elements in the new dataset: {len(gdf_grid)}")
@@ -221,13 +224,14 @@ def create_final_table_instance(gdf_grid):
     print('-' * 50)
     print(f"[INFO] Creating final table instance in {filename}...")
     
-    
+    cont = 1
     # print columns names  of df_grid
     with open(filename, 'w') as f:
         # first line with the columns names
-        f.write("customer weight coord_x coord_y fid\n")
+        f.write("customer weight coord_x coord_y id_grid5km fid\n")
         for idx, row in gdf_grid.iterrows():
-            f.write(f"{idx} {row['weight']} {row['geometry'].x} {row['geometry'].y} {row['fid']}\n")
+            f.write(f"{cont} {row['weight']} {row['geometry'].x} {row['geometry'].y} {idx} {row['fid']}\n")
+            cont += 1
 
     
     print('-' * 50)
@@ -239,7 +243,7 @@ gdf_points_grid_5km = load_grid_points_data('data/data_qgis/data_instance_paca/p
 gdf_points_grid_5km = calculate_weights(gdf_points_pop_paca, gdf_points_grid_5km)
 plot_pop_and_grid_points(gdf_points_pop_paca, gdf_points_grid_5km)
 
-gdf_points_grid_5km = filter_weights(gdf_points_grid_5km, 5) # Filter weights smaller than k and remove points with zero weight
+gdf_points_grid_5km = filter_weights(gdf_points_grid_5km, 0) # Filter weights smaller than k and remove points with zero weight
 plot_heatmap_grid_points(gdf_points_grid_5km)
 
 
