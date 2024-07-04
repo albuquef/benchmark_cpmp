@@ -135,6 +135,7 @@ def filter_weights(gdf_grid, k):
             zero_weight_points.plot(ax=ax, color='red', label=f'Removed (size: {len(zero_weight_points)})')
         plt.legend()
         plt.title(f"Grid points with the filter to reallocate weights smaller than {k}") 
+        plt.savefig('plots/creation_instance/customers/points_grid_5km_paca_table_filter.png')
         plt.show()
     
     return gdf_grid
@@ -180,6 +181,7 @@ def compare_grid_with_old_dataset(gdf_grid, gdf_old_dataset):
         ax[1].set_title(f"Heat Map of Grid Population (old dataset)\nnum elements={len(gdf_old_dataset)}  , sum wi= {gdf_old_dataset['weight'].sum()}")
         ax[1].set_xlabel("Easting")
         ax[1].set_ylabel("Northing")
+        plt.savefig('plots/creation_instance/customers/heatmaps_comparison.png')
         plt.show()
 
 
@@ -195,6 +197,7 @@ def plot_pop_and_grid_points(gdf_pop, gdf_grid):
     plt.xlabel("Easting")
     plt.ylabel("Northing")
     plt.legend()
+    plt.savefig('plots/creation_instance/customers/points_pop_grid_5km_paca_table.png')
     plt.show()
     
     # """Plots datasets side by side."""
@@ -215,6 +218,7 @@ def plot_heatmap_grid_points(gdf_grid):
     plt.title("Heat Map of Grid Points with Weights")
     plt.xlabel("Easting")
     plt.ylabel("Northing")
+    plt.savefig('plots/creation_instance/customers/points_grid_5km_paca_table_heatmap.png')
     plt.show()
 
 def create_final_table_instance(gdf_grid):

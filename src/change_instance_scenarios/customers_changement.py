@@ -106,6 +106,8 @@ ax[1].set_ylabel("Northing")
 ax[2].set_title(f"Heat Map of Grid Population (Split dataset)\nnum elements={len(gdf_split)}  , sum wi= {gdf_split['weight'].sum()}")
 ax[2].set_xlabel("Easting")
 ax[2].set_ylabel("Northing")
+plt.savefig('plots/diff_weights/heatmaps.png')
+plt.savefig('plots/diff_weights/heatmaps_weights.pdf')
 plt.show()
 
 

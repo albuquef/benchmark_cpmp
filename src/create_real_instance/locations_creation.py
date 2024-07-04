@@ -47,7 +47,6 @@ def load_service_points_data(filepath, type_equipment):
     gdf = gdf.to_crs(epsg=3035) # Convert to EPSG:3035
     return gdf
 
-
 # not covering all services points
 def create_voronoi(gdf_population, gdf_service, delta=10000):
     
