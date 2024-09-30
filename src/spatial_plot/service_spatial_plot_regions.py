@@ -11,14 +11,15 @@ def load_data(filepath):
     return pd.read_csv(filepath, sep=' ')
 
 # Create GeoDataFrame and reproject to WGS84
-def create_geodataframe(df):
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['coord_x'], df['coord_y']), crs="EPSG:900913")
+def create_geodataframe(df, CRS="EPSG:900913"):
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['coord_x'], df['coord_y']), crs=CRS)
     return gdf.to_crs(epsg=4326)
 
 # Add transformed longitude and latitude columns to the DataFrame
 def add_transformed_coordinates(df, gdf):
     df['longitude'] = gdf.geometry.x
     df['latitude'] = gdf.geometry.y
+    
 
 # Add shapefile boundaries with color highlighting to the plot
 # Add shapefile boundaries without filling polygons, just highlighting the boundaries
@@ -149,32 +150,153 @@ def plot_choropleth_mapbox(regions_gdf, center_lat, center_lon):
     
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     fig.show()
+    
+# Read the service data (new file)
+def load_service_data(filepath):
+    df = pd.read_csv(filepath, sep=',', header=0)
+    return df
+
+# Plot the number of points inside each region
+def count_points_in_regions(df, points_gdf, regions_gdf):
+    # Ensure the CRS of both GeoDataFrames match
+    points_gdf = points_gdf.set_crs("EPSG:4326")
+    regions_gdf = regions_gdf.set_crs("EPSG:4326")
+    
+    
+    points_gdf = points_gdf.to_crs(epsg=4326)
+    regions_gdf = regions_gdf.to_crs(epsg=4326)
+
+    
+    # Perform spatial join to count points within regions
+    # joined = gpd.sjoin(points_gdf, regions_gdf, how="inner", predicate="within")
+    
+    joined = gpd.sjoin(points_gdf, regions_gdf, how="inner", predicate="intersects")
+
+    
+    # Count the number of points inside each region
+    region_point_count = joined.groupby('index_right').size().reset_index(name='point_count')
+    
+    # Merge the point count back to the regions_gdf
+    regions_gdf['point_count'] = region_point_count.set_index('index_right')['point_count']
+    
+    # Fill NaN values with 0 in case some regions have no points inside
+    regions_gdf['point_count'].fillna(0, inplace=True)
+    
+    return regions_gdf
+
+def plot_point_count_mapbox(regions_gdf, center_lat, center_lon):
+    # Create custom bins for point_count
+    max_points = regions_gdf['point_count'].max()
+    bins = [0, 1, 5] + list(range(10, int(max_points) + 5, 5))  # Create intervals (0-0, 1-4, 5-9, etc.)
+    
+    # Create bins and assign labels
+    regions_gdf['point_count_bins'] = pd.cut(
+        regions_gdf['point_count'], 
+        bins=bins, 
+        include_lowest=True, 
+        labels=[f'{bins[i]}-{bins[i+1]-1}' for i in range(len(bins)-1)]
+    )
+
+    # Map colors to bins, ensuring '0-0' is gray
+    color_discrete_map = {'0-0': 'gray'}
+    
+    # Use a subset of the Viridis color scale for the other bins
+    viridis_colors = px.colors.sequential.Viridis[1:]  # Skip the first color
+    for i, label in enumerate(regions_gdf['point_count_bins'].unique()[1:], 1):
+        color_discrete_map[label] = viridis_colors[i % len(viridis_colors)]
+
+    # Fill NaNs with '0-0' for regions without points
+    regions_gdf['point_count_bins'].fillna('0-0', inplace=True)
+
+    # Convert 'point_count_bins' to a categorical type
+    regions_gdf['point_count_bins'] = regions_gdf['point_count_bins'].astype('category')
+
+    # Plot with discrete colors
+    fig = px.choropleth_mapbox(
+        regions_gdf,
+        geojson=regions_gdf.geometry.__geo_interface__,
+        locations=regions_gdf.index,
+        color='point_count_bins',  # Use the binned point count for coloring
+        color_discrete_map=color_discrete_map,  # Apply custom color mapping
+        center={"lat": center_lat, "lon": center_lon},
+        zoom=7,
+        mapbox_style=MAPBOX_STYLE,
+        opacity=0.6
+    )
+    
+    # Update layout and fix the legend order
+    fig.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        legend_title_text='Number of Points',
+        coloraxis_colorbar=dict(
+            title="Number of Points",
+            tickvals=[i for i in range(len(bins))],  # Tick values correspond to bins
+            ticktext=[f'{bins[i]}-{bins[i+1]-1}' for i in range(len(bins)-1)]  # Show intervals in the legend
+        )
+    )
+
+    fig.show()
+
+# Plot the choropleth map along with points
+def plot_choropleth_mapbox_with_points(regions_gdf, points_gdf, center_lat, center_lon):
+    # Plot the choropleth map
+    fig = px.choropleth_mapbox(
+        regions_gdf,
+        geojson=regions_gdf.geometry.__geo_interface__,  # Convert GeoDataFrame geometries to GeoJSON
+        locations=regions_gdf.index,  # Use the index as the location identifier
+        color='point_count',  # Use the point count for coloring
+        center={"lat": center_lat, "lon": center_lon},
+        zoom=7,
+        color_continuous_scale="Viridis",  # Choose a color scale
+        mapbox_style=MAPBOX_STYLE,
+        opacity=0.6
+    )
+    
+    # Add points on top of the choropleth
+    fig.add_scattermapbox(
+        lat=points_gdf.geometry.x,
+        lon=points_gdf.geometry.y,
+        mode='markers',
+        # marker=px.scatter_mapbox.Marker(size=7, color='red', opacity=0.7),
+        hoverinfo='text',
+        text=points_gdf['fid'],  # Change this to whatever column contains point info
+        showlegend=False
+    )
+
+    # Show the plot
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    fig.show()
 
 # Main function to run the entire process
 def main():
     # File paths
     data_path = '/home/felipe/Documents/Projects/GeoAvigon/pmp_code/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037.txt'
     # data_path = '/home/felipe/Documents/Projects/GeoAvigon/pmp_code/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037_shuffle.txt'
+    # Load and prepare data
+    df = load_data(data_path)
+    gdf = create_geodataframe(df)
+    add_transformed_coordinates(df, gdf)
+    # Calculate the center point for the map
+    center_lat = df['latitude'].mean()
+    center_lon = df['longitude'].mean()
+    
+    data_service_path = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/tables/table_reel_locs_cinema.csv'  # Replace with actual file path for service data
+    df_service = load_service_data(data_service_path)
+    gdf_service = create_geodataframe(df_service,"2154")  # Create a GeoDataFrame from service data
+    
+    
+    
     shapefile_paca = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/PACA_region_polygon.shp'
     
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/Arrondissement.shp'  # Replace with actual path to your regions shapefile
     shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/canton.shp'
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/commune.shp'
-    
-    
-        # Load and prepare data
-    df = load_data(data_path)
-    gdf = create_geodataframe(df)
-    add_transformed_coordinates(df, gdf)
 
     # Load shapefiles
     region_gdf_paca = load_shapefile(shapefile_paca)
     region_gdf_regions = load_shapefile(shapefile_regions)
 
-    # Calculate the center point for the map
-    center_lat = df['latitude'].mean()
-    center_lon = df['longitude'].mean()
 
     plot_points = False
     # Plot points if `plot_points` is True
@@ -198,11 +320,18 @@ def main():
         # Show the plot
         fig.show()
 
-    # Calculate the sum of weights in each region and update the region GeoDataFrame
-    region_gdf_regions = sum_weights_in_regions(df, gdf, region_gdf_regions)
-
-    # Plot the choropleth map with the summed weights
-    plot_choropleth_mapbox(region_gdf_regions, center_lat, center_lon)
+    # # Calculate the sum of weights in each region and update the region GeoDataFrame
+    # region_gdf_regions = sum_weights_in_regions(df, gdf, region_gdf_regions)
+    # # Plot the choropleth map with the summed weights
+    # plot_choropleth_mapbox(region_gdf_regions, center_lat, center_lon)
+    
+    
+    # Calculate the number of points in each region and update the region GeoDataFrame
+    region_gdf_regions = count_points_in_regions(df_service, gdf_service, region_gdf_regions)
+    # print(region_gdf_regions)
+    # Plot the choropleth map with the point counts
+    plot_point_count_mapbox(region_gdf_regions, center_lat, center_lon)
+    # plot_choropleth_mapbox_with_points(region_gdf_regions, gdf_service, center_lat, center_lon)
     
 
 
