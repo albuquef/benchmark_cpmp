@@ -75,17 +75,77 @@ def sum_weights_in_regions(df, points_gdf, regions_gdf):
 
 # Plot the choropleth map
 def plot_choropleth_mapbox(regions_gdf, center_lat, center_lon):
+    # Define quantile intervals for 'weight_sum'
+    # q = np.quantile(regions_gdf['weight_sum'], [0.25, 0.5, 0.75])
+    
+    # # Add a new column with the quantile classification
+    # regions_gdf['weight_quantile'] = pd.cut(
+    #     regions_gdf['weight_sum'],
+    #     bins=[regions_gdf['weight_sum'].min(), q[0], q[1], q[2], regions_gdf['weight_sum'].max()],
+    #     labels=["Low", "Medium-Low", "Medium-High", "High"]
+    # )
+    
+    # num_bins = 8
+    # # Define equal interval breaks for 'weight_sum'
+    # min_val = regions_gdf['weight_sum'].min()
+    # max_val = regions_gdf['weight_sum'].max()
+    # bins = np.linspace(min_val, max_val, num_bins + 1)
+    
+    # # Add a new column with the equal interval classification
+    # regions_gdf['weight_interval'] = pd.cut(
+    #     regions_gdf['weight_sum'],
+    #     bins=bins,
+    #     labels=[f"Interval {i+1}" for i in range(num_bins)],
+    #     include_lowest=True
+    # )
+    
+    # bin_size = 50000
+    # # Define intervals starting from min value and increasing by bin_size (100k)
+    # min_val = regions_gdf['weight_sum'].min()
+    # max_val = regions_gdf['weight_sum'].max()
+    
+    # # Create bins from min value to max value with 100k intervals
+    # bins = np.arange(min_val, max_val + bin_size, bin_size)
+    
+    # # Add a new column with the custom interval classification
+    # regions_gdf['weight_interval'] = pd.cut(
+    #     regions_gdf['weight_sum'],
+    #     bins=bins,
+    #     include_lowest=True
+    # )
+    
+    # Plot the choropleth map
     fig = px.choropleth_mapbox(
         regions_gdf,
         geojson=regions_gdf.geometry.__geo_interface__,  # Convert GeoDataFrame geometries to GeoJSON
         locations=regions_gdf.index,  # Use the index as the location identifier
-        color='weight_sum',  # Use the summed weight for coloring
+        # color='weight_quantile',  # Use the quantile classification for coloring
+        # color='weight_interval',  # Use the quantile classification for coloring
+        color='weight_sum',
         center={"lat": center_lat, "lon": center_lon},
         zoom=7,
+        color_continuous_scale="Viridis",  # Choose a color scale
+        # color_discrete_map={
+        #     "Low": "lightblue",
+        #     "Medium-Low": "lightgreen",
+        #     "Medium-High": "orange",
+        #     "High": "red"
+        # },  # Define color for each quantile
         mapbox_style=MAPBOX_STYLE,
-        color_continuous_scale="Viridis",  # Choose color scale
         opacity=0.6
     )
+    
+    
+    # Update layout to include colorbar
+    # fig.update_layout(
+    #     margin={"r": 0, "t": 0, "l": 0, "b": 0},
+    #     coloraxis_colorbar={
+    #         'title': 'Weight Sum',
+    #         'tickvals': bins,  # Show the bin edges as ticks on the colorbar
+    #         'ticktext': [f'{int(val/1000)}k' for val in bins]  # Format tick labels in thousands (k)
+    #     }
+    # )
+    
     
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     fig.show()
