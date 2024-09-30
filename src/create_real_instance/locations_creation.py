@@ -42,6 +42,7 @@ def filter_by_type_equipment(df, type_equipment):
 def load_service_points_data(filepath, type_equipment):
     """Loads grid data and converts CRS."""
     df = pd.read_csv(filepath, low_memory=False)
+    # df = pd.read_csv(filepath)
     df = filter_by_type_equipment(df, type_equipment)
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['LAMBERT_X'], df['LAMBERT_Y']), crs='IGNF:RGF93LAMB93') # coordinates in LAMB93
     gdf = gdf.to_crs(epsg=3035) # Convert to EPSG:3035
@@ -312,12 +313,13 @@ def create_final_table_locations(cap_polygons):
 # Load population data
 gdf_population = load_population_data('data/data_qgis/data_instance_paca/points_population_1km_paca_table.csv')
 # # Load service points data
-gdf_service = load_service_points_data('data/data_qgis/data_instance_paca/bpe21_sport_loisir_xy_paca_table.csv', 'F303')
+# gdf_service = load_service_points_data('data/data_qgis/data_instance_paca/bpe21_sport_loisir_xy_paca_table.csv', 'D106')
+gdf_service = load_service_points_data('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/BPE23.csv', 'D106')
 # plot_population_and_service_points(gdf_population, gdf_service)
 
 # create_voronoi(gdf_population, gdf_service, delta=10000) # not covering all services points
 # read a polygon shapefile as a GeoDataFrame
-gdf_voronoi = gpd.read_file('/home/felipe/Documents/Projects/GeoAvigon/qgis/PACA_instance_qgis/voronoi_paca_bpe_F303.shp')
+gdf_voronoi = gpd.read_file('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/Voronoi_Polygons/polygon_voronoi_BPE23_D106_paca.shp')
 gdf_voronoi = gdf_voronoi.to_crs(epsg=3035)
 
 # # plotting
@@ -326,8 +328,8 @@ plot_voronoi_polygons(gdf_population, gdf_voronoi, gdf_service, delta=10000)
 print(len(gdf_voronoi))
 print(len(gdf_service))
 
-# cap_polygons = count_points_in_voronoi_polygons(gdf_population, gdf_voronoi)
-cap_polygons = load_cap_polygons('outputs/PACA_Jun2024/cap_polygons_voronoi_Jun2024.txt')
+cap_polygons = count_points_in_voronoi_polygons(gdf_population, gdf_voronoi)
+cap_polygons = load_cap_polygons('outputs/PACA_Jun2024/cap_polygons_voronoi_urgenc_Jul2024.txt')
 create_final_table_locations(cap_polygons)
 
 

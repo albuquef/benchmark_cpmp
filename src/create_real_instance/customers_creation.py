@@ -4,6 +4,7 @@ from shapely.geometry import Point
 import re
 import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
+import seaborn as sns
 
 
 # points population 1km paca with demand weight
@@ -65,6 +66,32 @@ def calculate_weights(gdf_pop, gdf_grid):
         print(f"Sum of 'weight' grid: {sum_weight}")
         
     print('-' * 50)
+    
+    
+
+    # Step 3: Set up side-by-side histograms
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True)  # 1 row, 2 columns
+
+    # Plot the histogram for gdf_pop weights on the first axis
+    axes[0].hist(gdf_pop['ind'], bins=30, alpha=0.7, color='blue', edgecolor='black')
+    axes[0].set_title('grid 1km')
+    axes[0].set_xlabel('Weight')
+    axes[0].set_ylabel('Frequency (log)')
+    axes[0].set_yscale('log')  # Use logarithmic scale for y-axis
+
+    # Plot the histogram for gdf_grid weights on the second axis
+    axes[1].hist(gdf_grid['weight'], bins=30, alpha=0.7, color='green', edgecolor='black')
+    axes[1].set_title('grid 5km')
+    axes[1].set_xlabel('Weight')
+    axes[1].set_yscale('log')  # Use logarithmic scale for y-axis
+
+    # Adding a main title for both histograms
+    fig.suptitle('Side-by-Side Comparison of Weight Frequency: grid 1km vs grid 5km')
+
+    # Show the plot
+    plt.tight_layout()
+    plt.savefig("plot_histogram_grid_1km_vs_grid_5km.png")
+    plt.show()
     
     return gdf_grid
 
