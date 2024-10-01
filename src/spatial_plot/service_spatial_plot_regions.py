@@ -1,6 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 
 # Global variable for Mapbox style
@@ -237,6 +238,61 @@ def plot_point_count_mapbox(regions_gdf, center_lat, center_lon):
 
     fig.show()
 
+
+def plot_point_percentage_mapbox(regions_gdf, center_lat, center_lon, show_percent_labels=True):
+    # Calculate the percentage of points inside each region
+    total_points = regions_gdf['point_count'].sum()
+    regions_gdf['point_percentage'] = (regions_gdf['point_count'] / total_points) * 100  # Calculate percentage
+    
+    # Set up a continuous color scale from light blue to dark blue
+    color_scale = px.colors.sequential.Blues
+    
+    # Plot with continuous colors based on point percentage
+    fig = px.choropleth_mapbox(
+        regions_gdf,
+        geojson=regions_gdf.geometry.__geo_interface__,
+        locations=regions_gdf.index,
+        color='point_percentage',  # Use the percentage of points for coloring
+        color_continuous_scale=color_scale,  # Apply continuous color scale
+        center={"lat": center_lat, "lon": center_lon},
+        zoom=7,
+        mapbox_style=MAPBOX_STYLE,
+        opacity=0.6
+    )
+    
+    # Reproject geometries to a projected CRS (e.g., EPSG:2154 for Lambert 94) before calculating centroids
+    regions_projected = regions_gdf.to_crs(epsg=2154)
+    regions_projected['centroid'] = regions_projected.geometry.centroid  # Calculate centroids in the projected CRS
+
+    # Reproject centroids back to the original CRS (EPSG:4326) for plotting
+    centroids_geo = regions_projected['centroid'].to_crs(epsg=4326)
+    
+    if show_percent_labels:
+        # Create a scatter layer for text labels using go.Scattermapbox
+        scatter_data = go.Scattermapbox(
+            lat=centroids_geo.y,  # Latitude from reprojected centroids
+            lon=centroids_geo.x,  # Longitude from reprojected centroids
+            mode='text',
+            text=regions_gdf['point_percentage'].apply(lambda x: f"{x:.2f}%"),  # Format percentages
+            textfont=dict(size=300000000, color='black'),  # Customize font size and color
+            textposition="middle center",  # Place text at the center of each region
+            marker=dict(size=100000000, color='black')
+        )
+        fig.add_trace(scatter_data)
+    
+    # Update layout and color bar settings
+    fig.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        legend_title_text='Percentage of Points',
+        coloraxis_colorbar=dict(
+            title="Percentage of Service Points",
+            ticks="outside",
+            tickformat=".2f"  # Show two decimal places for percentages
+        )
+    )
+
+    fig.show()
+
 # Plot the choropleth map along with points
 def plot_choropleth_mapbox_with_points(regions_gdf, points_gdf, center_lat, center_lon):
     # Plot the choropleth map
@@ -270,8 +326,8 @@ def plot_choropleth_mapbox_with_points(regions_gdf, points_gdf, center_lat, cent
 # Main function to run the entire process
 def main():
     # File paths
-    data_path = '/home/felipe/Documents/Projects/GeoAvigon/pmp_code/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037.txt'
-    # data_path = '/home/felipe/Documents/Projects/GeoAvigon/pmp_code/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037_shuffle.txt'
+    # data_path = '/home/felipe/Documents/Projects/GeoAvigon/pmp_code/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037.txt'
+    data_path = '/home/falbuquerque/Documents/projects/GeoAvignon/PMPSolver/data/PACA_jul24/cust_weights_PACA_2037.txt'
     # Load and prepare data
     df = load_data(data_path)
     gdf = create_geodataframe(df)
@@ -280,16 +336,27 @@ def main():
     center_lat = df['latitude'].mean()
     center_lon = df['longitude'].mean()
     
-    data_service_path = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/tables/table_reel_locs_cinema.csv'  # Replace with actual file path for service data
+    # data_service_path = 'data/solutions_service_cinema/points_BPE23_F303_paca_table.csv'
+    # df_service = load_service_data(data_service_path)
+    # print(df_service.head())    
+    # gdf_service = create_geodataframe(df_service,"EPSG:2154")  # Create a GeoDataFrame from service data
+    
+    data_service_path = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP_table.txt'
+    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton_table.txt'
+    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_EPCI_p_192_EXACT_CPMP_cover_EPCI_table.txt'
+    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_commune_p_192_EXACT_CPMP_cover_commune_table.txt'
     df_service = load_service_data(data_service_path)
-    gdf_service = create_geodataframe(df_service,"2154")  # Create a GeoDataFrame from service data
+    print(df_service.head())    
+    gdf_service = create_geodataframe(df_service)  # Create a GeoDataFrame from service data
     
     
     
-    shapefile_paca = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/PACA_region_polygon.shp'
-    
+    # shapefile_paca = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/PACA_region_polygon.shp'
+    shapefile_paca = '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/PACA_region.shp'
+
+    shapefile_regions = '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/canton.shp'
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/Arrondissement.shp'  # Replace with actual path to your regions shapefile
-    shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
+    # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PAeCA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/canton.shp'
     # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/commune.shp'
 
@@ -320,6 +387,7 @@ def main():
         # Show the plot
         fig.show()
 
+
     # # Calculate the sum of weights in each region and update the region GeoDataFrame
     # region_gdf_regions = sum_weights_in_regions(df, gdf, region_gdf_regions)
     # # Plot the choropleth map with the summed weights
@@ -330,9 +398,9 @@ def main():
     region_gdf_regions = count_points_in_regions(df_service, gdf_service, region_gdf_regions)
     # print(region_gdf_regions)
     # Plot the choropleth map with the point counts
-    plot_point_count_mapbox(region_gdf_regions, center_lat, center_lon)
+    # plot_point_count_mapbox(region_gdf_regions, center_lat, center_lon)
     # plot_choropleth_mapbox_with_points(region_gdf_regions, gdf_service, center_lat, center_lon)
-    
+    plot_point_percentage_mapbox(region_gdf_regions, center_lat, center_lon)
 
 
 # Execute the main function
