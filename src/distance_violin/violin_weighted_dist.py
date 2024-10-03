@@ -359,10 +359,19 @@ distances_df = parse_distances(dist_file)
 merged_df_1 = calculate_weights(assignments_df_1, distances_df)
 merged_df_2 = calculate_weights(assignments_df_2, distances_df)
 
+# indentify the outliers
+# print(merged_df_1[merged_df_1['wi_dij'] > 3600])
+# print(merged_df_2[merged_df_2['wi_dij'] > 3600])
+# exit()
 
 
 # merged_df_1 = calculate_distances_unweighted(assignments_df_1, distances_df)
 # merged_df_2 = calculate_distances_unweighted(assignments_df_2, distances_df)
+
+print(merged_df_1[merged_df_1['distance'] > 3600])
+print(merged_df_2[merged_df_2['distance'] > 3600])
+exit()
+
 
 
 # Extract the wi * dij values for comparison
