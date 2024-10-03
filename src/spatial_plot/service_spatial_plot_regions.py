@@ -3,6 +3,9 @@ import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import plotly.figure_factory as ff
+from plotly.subplots import make_subplots
+
 
 # Global variable for Mapbox style
 MAPBOX_STYLE = 'carto-positron'
@@ -21,6 +24,20 @@ def add_transformed_coordinates(df, gdf):
     df['longitude'] = gdf.geometry.x
     df['latitude'] = gdf.geometry.y
     
+
+
+def filter_shapefile_fields(shapefile_gdf, shapefile_path):
+
+    if shapefile_path.endswith("Arrondissement.shp"):
+        shapefile_gdf = shapefile_gdf.rename(columns={"codearondo": "region_name"})
+    elif shapefile_path.endswith("EPCI.shp"):
+        shapefile_gdf = shapefile_gdf.rename(columns={"NOM_EPCI": "region_name"})
+    elif shapefile_path.endswith("canton.shp"):
+        shapefile_gdf = shapefile_gdf.rename(columns={"numcant": "region_name"})
+    elif shapefile_path.endswith("commune.shp"):
+        shapefile_gdf = shapefile_gdf.rename(columns={"NOM_COMM": "region_name"})
+
+    return shapefile_gdf
 
 # Add shapefile boundaries with color highlighting to the plot
 # Add shapefile boundaries without filling polygons, just highlighting the boundaries
@@ -238,57 +255,65 @@ def plot_point_count_mapbox(regions_gdf, center_lat, center_lon):
 
     fig.show()
 
-
-def plot_point_percentage_mapbox(regions_gdf, center_lat, center_lon, show_percent_labels=True):
+def plot_percentage_choropleth_mapbox(regions_gdf, center_lat, center_lon, show_zero_percentage=False):
+    
     # Calculate the percentage of points inside each region
+    regions_gdf['point_count'] = regions_gdf['point_count'].fillna(0)  # Avoid inplace=True
+
     total_points = regions_gdf['point_count'].sum()
     regions_gdf['point_percentage'] = (regions_gdf['point_count'] / total_points) * 100  # Calculate percentage
     
-    # Set up a continuous color scale from light blue to dark blue
-    color_scale = px.colors.sequential.Blues
-    
-    # Plot with continuous colors based on point percentage
+    # Define custom colorscale
+    colorscale = ["#f7fbff", "#ebf3fb", "#deebf7", "#d2e3f3", "#c6dbef", "#b3d2e9", "#9ecae1",
+                  "#85bcdb", "#6baed6", "#57a0ce", "#4292c6", "#3082be", "#2171b5", "#1361a9",
+                  "#08519c", "#0b4083", "#08306b"]
+
+    # Create the choropleth map
     fig = px.choropleth_mapbox(
         regions_gdf,
         geojson=regions_gdf.geometry.__geo_interface__,
-        locations=regions_gdf.index,
-        color='point_percentage',  # Use the percentage of points for coloring
-        color_continuous_scale=color_scale,  # Apply continuous color scale
+        locations=regions_gdf.index,  # Ensure this is a unique identifier
+        color='point_percentage',
+        mapbox_style='carto-positron',  # Use a valid Mapbox style
         center={"lat": center_lat, "lon": center_lon},
         zoom=7,
-        mapbox_style=MAPBOX_STYLE,
-        opacity=0.6
+        opacity=0.6,
+        color_continuous_scale=colorscale,
+        labels={'point_percentage': '% of Points'},
+        hover_name='region_name',  # Add the region names here
+        hover_data={"point_percentage": True, "point_count": True}  # Add point count to hover data
     )
-    
-    # Reproject geometries to a projected CRS (e.g., EPSG:2154 for Lambert 94) before calculating centroids
-    regions_projected = regions_gdf.to_crs(epsg=2154)
-    regions_projected['centroid'] = regions_projected.geometry.centroid  # Calculate centroids in the projected CRS
 
-    # Reproject centroids back to the original CRS (EPSG:4326) for plotting
-    centroids_geo = regions_projected['centroid'].to_crs(epsg=4326)
-    
-    if show_percent_labels:
-        # Create a scatter layer for text labels using go.Scattermapbox
-        scatter_data = go.Scattermapbox(
-            lat=centroids_geo.y,  # Latitude from reprojected centroids
-            lon=centroids_geo.x,  # Longitude from reprojected centroids
-            mode='text',
-            text=regions_gdf['point_percentage'].apply(lambda x: f"{x:.2f}%"),  # Format percentages
-            textfont=dict(size=300000000, color='black'),  # Customize font size and color
-            textposition="middle center",  # Place text at the center of each region
-            marker=dict(size=100000000, color='black')
+    # Add static annotations for point count
+    for _, row in regions_gdf.iterrows():
+        centroid = row.geometry.centroid  # Get the centroid of each region
+        
+        # Format the text based on show_zero_percentage
+        if row['point_percentage'] == 0 and not show_zero_percentage:
+            text = ""  # Do not show text for zero percentage
+        else:
+            text = f"{row['point_percentage']:.1f}%"  # Format the percentage with one decimal place
+        
+        fig.add_trace(
+            go.Scattermapbox(
+                lon=[centroid.x], lat=[centroid.y],  # Position of the centroid
+                mode='text',
+                text=text,  # Use the formatted text
+                textfont=dict(size=14, color="black"),  # Customize the font size and color
+                showlegend=False
+            )
         )
-        fig.add_trace(scatter_data)
-    
-    # Update layout and color bar settings
+
+    # Update layout
     fig.update_layout(
-        margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        legend_title_text='Percentage of Points',
-        coloraxis_colorbar=dict(
-            title="Percentage of Service Points",
-            ticks="outside",
-            tickformat=".2f"  # Show two decimal places for percentages
-        )
+        title_text='Region by Percentage of Points (with Static Point Count Labels)',
+        legend_title='% of Points',
+        mapbox=dict(
+            style="carto-positron",
+            zoom=7,
+            center={"lat": center_lat, "lon": center_lon},
+        ),
+        margin={"r":0,"t":0,"l":0,"b":0}
     )
 
     fig.show()
@@ -323,6 +348,101 @@ def plot_choropleth_mapbox_with_points(regions_gdf, points_gdf, center_lat, cent
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     fig.show()
 
+
+
+def plot_percentage_choropleth_mapbox_with_points(regions_gdf, points_gdf, center_lat, center_lon, show_zero_percentage=True):
+    
+    # Calculate the percentage of points inside each region
+    regions_gdf['point_count'] = regions_gdf['point_count'].fillna(0)  # Avoid inplace=True
+
+    total_points = regions_gdf['point_count'].sum()
+    regions_gdf['point_percentage'] = (regions_gdf['point_count'] / total_points) * 100  # Calculate percentage
+    
+    # Define custom colorscale
+    # colorscale = ["#f7fbff", "#ebf3fb", "#deebf7", "#d2e3f3", "#c6dbef", "#b3d2e9", "#9ecae1",
+    #               "#85bcdb", "#6baed6", "#57a0ce", "#4292c6", "#3082be", "#2171b5", "#1361a9",
+    #               "#08519c", "#0b4083", "#08306b"]
+    colorscale = px.colors.sequential.OrRd  # A perceptually distinct color scale
+
+
+    # Create the choropleth map
+    fig = px.choropleth_mapbox(
+        regions_gdf,
+        geojson=regions_gdf.geometry.__geo_interface__,
+        locations=regions_gdf.index,  # Ensure this is a unique identifier
+        color='point_percentage',
+        mapbox_style='carto-positron',  # Use a valid Mapbox style
+        center={"lat": center_lat, "lon": center_lon},
+        zoom=7,
+        opacity=0.6,
+        color_continuous_scale=colorscale,
+        labels={'point_percentage': '% of Service Points'},
+        hover_name='region_name',  # Add the region names here
+        hover_data={"point_percentage": True, "point_count": True}  # Add point count to hover data
+    )
+
+        # Add points to the map
+    fig.add_trace(
+        go.Scattermapbox(
+            lon=points_gdf.geometry.x,  # Longitude of points
+            lat=points_gdf.geometry.y,  # Latitude of points
+            mode='markers',
+            marker=dict(size=8, color='blue', opacity=0.3),  # Customize marker size and color
+            name='Points',  # Legend entry for points
+            hoverinfo='text',
+            showlegend=False,
+            text=points_gdf['point_name'] if 'point_name' in points_gdf.columns else None  # Optional point labels
+        )
+    )
+
+    # Add static annotations for point count
+    for _, row in regions_gdf.iterrows():
+        centroid = row.geometry.centroid  # Get the centroid of each region
+        
+        # Format the text based on show_zero_percentage
+        if row['point_percentage'] == 0 and not show_zero_percentage:
+            text = ""  # Do not show text for zero percentage
+        else:
+            text = f"{row['point_percentage']:.1f}%"  # Format the percentage with one decimal place
+        
+        fig.add_trace(
+            go.Scattermapbox(
+                lon=[centroid.x], lat=[centroid.y],  # Position of the centroid
+                mode='text',
+                text=text,  # Use the formatted text
+                textfont=dict(size=15, color="black"),  # Customize the font size and color
+                showlegend=False
+            )
+        )
+    
+    fig.update_layout(
+        # title_text='Percentage of Service Points in Arrondissement divisions (PACA) - Model Cover Arrond',
+        title_text=f'Model {model_type} - {decoupage_type} divisions (PACA)',
+        title_font=dict(size=20),  # Increase title font size
+        legend_title='% of Points',
+        mapbox=dict(
+            style="carto-positron",
+            zoom=7,
+            center={"lat": center_lat, "lon": center_lon},
+        ),
+        margin={"r":0,"t":50,"l":0,"b":0},  # Adjust top margin for title
+        annotations=[
+            dict(
+                text='Data Source: [Your Data Source Here]',  # Add data source if needed
+                xref='paper', yref='paper',
+                x=0.5, y=-0.1,  # Position below the map
+                showarrow=False,
+                font=dict(size=12, color='black')
+            )
+        ]
+    )
+
+    add_shapefile_boundaries(fig, region_gdf_paca, line_color='black')
+
+    fig.show()
+
+
+
 # Main function to run the entire process
 def main():
     # File paths
@@ -336,33 +456,50 @@ def main():
     center_lat = df['latitude'].mean()
     center_lon = df['longitude'].mean()
     
-    # data_service_path = 'data/solutions_service_cinema/points_BPE23_F303_paca_table.csv'
-    # df_service = load_service_data(data_service_path)
-    # print(df_service.head())    
-    # gdf_service = create_geodataframe(df_service,"EPSG:2154")  # Create a GeoDataFrame from service data
+    global model_type 
+
+    model_type = 'Real BPE23'
+    # model_type = 'Cover Commune'  # 'Cover Arrond', 'Cover EPCI', 'Cover Canton', 'Cover Commune'
+
+    if model_type == 'Real BPE23':
+        data_service_path = 'data/solutions_service_cinema/points_BPE23_F303_paca_table.csv'
+        df_service = load_service_data(data_service_path)
+        # print(df_service.head())    
+        gdf_service = create_geodataframe(df_service,"EPSG:2154")  # Create a GeoDataFrame from service data
+
+    if model_type == 'Cover Arrond' or model_type == 'No Cover':
+        data_service_path = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP_table.txt'
+    elif model_type == 'Cover EPCI':
+        data_service_path = 'data/solutions_service_cinema/test_paca_cinema_EPCI_p_192_EXACT_CPMP_cover_EPCI_table.txt'
+    elif model_type == 'Cover Canton':
+        data_service_path = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton_table.txt'
+    elif model_type == 'Cover Commune':
+        data_service_path = 'data/solutions_service_cinema/test_paca_cinema_commune_p_192_EXACT_CPMP_cover_commune_table.txt'    
     
-    data_service_path = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP_table.txt'
-    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton_table.txt'
-    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_EPCI_p_192_EXACT_CPMP_cover_EPCI_table.txt'
-    # data_service_path = 'data/solutions_service_cinema/test_paca_cinema_commune_p_192_EXACT_CPMP_cover_commune_table.txt'
     df_service = load_service_data(data_service_path)
-    print(df_service.head())    
-    gdf_service = create_geodataframe(df_service)  # Create a GeoDataFrame from service data
-    
-    
+    gdf_service = create_geodataframe(df_service)
+
+    if model_type == 'Real BPE23':
+        gdf_service = create_geodataframe(df_service,"EPSG:2154")  # Create a GeoDataFrame from service data
     
     # shapefile_paca = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/PACA_region_polygon.shp'
     shapefile_paca = '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/PACA_region.shp'
 
-    shapefile_regions = '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/canton.shp'
-    # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/Arrondissement.shp'  # Replace with actual path to your regions shapefile
-    # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PAeCA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
-    # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/canton.shp'
-    # shapefile_regions = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/commune.shp'
+    global decoupage_type
+    decoupage_type = 'canton' # 'Arrondissement', 'EPCI', 'canton', 'commune'
+
+    shapefile_regions = f'/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/{decoupage_type}.shp'
+    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/Arrondissement.shp'  # Replace with actual path to your regions shapefile
+    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PAeCA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
+    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/canton.shp'
+    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/commune.shp'
 
     # Load shapefiles
+    global region_gdf_paca
     region_gdf_paca = load_shapefile(shapefile_paca)
-    region_gdf_regions = load_shapefile(shapefile_regions)
+    region_gdf_regions = load_shapefile(shapefile_regions)   
+    region_gdf_regions = filter_shapefile_fields(region_gdf_regions, shapefile_regions)
+
 
 
     plot_points = False
@@ -399,8 +536,11 @@ def main():
     # print(region_gdf_regions)
     # Plot the choropleth map with the point counts
     # plot_point_count_mapbox(region_gdf_regions, center_lat, center_lon)
+
     # plot_choropleth_mapbox_with_points(region_gdf_regions, gdf_service, center_lat, center_lon)
-    plot_point_percentage_mapbox(region_gdf_regions, center_lat, center_lon)
+    # plot_point_percentage_mapbox(region_gdf_regions, gdf_service, center_lat, center_lon, show_percent_labels=True)
+
+    plot_percentage_choropleth_mapbox_with_points(region_gdf_regions, gdf_service, center_lat, center_lon, show_zero_percentage=False)
 
 
 # Execute the main function
