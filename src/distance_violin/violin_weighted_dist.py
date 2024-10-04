@@ -315,6 +315,82 @@ def plot_outliers_ecdf(wi_dij_1, wi_dij_2):
     plt.legend()
     plt.show()
 
+
+def plot_distance_outliers_scatter(dist_1, dist_2, dist_3, dist_4, threshold=3600):
+    # Step 1: Combine distance datasets and filter for distances greater than the threshold
+    data_combined_distances = pd.concat([pd.DataFrame({'distance': dist_1, 'Cover type': 'No Cover'}),
+                                         pd.DataFrame({'distance': dist_2, 'Cover type': 'Cover EPCI'}),
+                                         pd.DataFrame({'distance': dist_3, 'Cover type': 'Cover Canton'}),
+                                         pd.DataFrame({'distance': dist_4, 'Cover type': 'Cover Commune'})])
+    
+    # Step 2: Filter distances above the threshold (e.g., 3600)
+    outliers_data = data_combined_distances[data_combined_distances['distance'] > threshold]
+    
+    # Step 3: Count the number of outliers for each Cover type in the correct order
+    cover_order = ['No Cover', 'Cover EPCI', 'Cover Canton', 'Cover Commune']
+    outlier_counts = outliers_data['Cover type'].value_counts().reindex(cover_order).fillna(0).to_dict()
+
+    # Step 4: Create a scatter plot for the outliers without the legend
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(data=outliers_data, x="Cover type", y="distance", hue="Cover type", s=100, legend=False)
+
+    # Step 5: Add titles and labels
+    plt.title(f'Outliers in Distance (> {threshold}) between Cover Models (Cinema p = 192)')
+    plt.ylabel('Distance (dij)')
+    plt.xlabel('Cover type')
+
+    # Step 6: Annotate the plot with the number of outliers in the correct x positions
+    for i, cover_type in enumerate(cover_order):
+        count = int(outlier_counts[cover_type])
+        plt.text(x=i, 
+                 y=outliers_data['distance'].max() + 100,  # Adjust for label placement
+                 s=f'Count: {count}',
+                 horizontalalignment='center',
+                 color='red',
+                 fontweight='bold')
+
+    # Step 7: Show the plot
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_outliers_boxplot_and_line(wi_dij_1, wi_dij_2, wi_dij_3, wi_dij_4, dist_1, dist_2, dist_3, dist_4):
+    # Step 1: Combine wi_dij datasets for the boxplot
+    data_combined_wi_dij = pd.concat([pd.DataFrame({'value': wi_dij_1, 'Cover type': 'No Cover'}),
+                                      pd.DataFrame({'value': wi_dij_2, 'Cover type': 'Cover EPCI'}),
+                                      pd.DataFrame({'value': wi_dij_3, 'Cover type': 'Cover Canton'}),
+                                      pd.DataFrame({'value': wi_dij_4, 'Cover type': 'Cover Commune'})])
+
+    # Step 2: Combine distance datasets for the second plot (same structure as wi_dij)
+    data_combined_distances = pd.concat([pd.DataFrame({'value': dist_1, 'Cover type': 'No Cover'}),
+                                         pd.DataFrame({'value': dist_2, 'Cover type': 'Cover EPCI'}),
+                                         pd.DataFrame({'value': dist_3, 'Cover type': 'Cover Canton'}),
+                                         pd.DataFrame({'value': dist_4, 'Cover type': 'Cover Commune'})])
+
+    # Step 3: Create subplots with two rows: one for boxplots (wi_dij), one for line plot (distance)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12), gridspec_kw={'height_ratios': [2, 1]})
+
+    # Step 4: Plot boxplot for wi_dij values
+    sns.boxplot(data=data_combined_wi_dij, x="Cover type", y="value", showfliers=True, whis=1.5, ax=ax1)
+    ax1.set_title('Comparison of wi * dij between Solutions of Covers Models (Cinema p = 192)')
+    ax1.set_ylabel('wi * dij')
+    ax1.set_ylim(0, None)  # Adjust y-limits to focus on outliers if needed
+
+    # Step 5: Add a title between the plots
+    # fig.suptitle('Comparison of Solutions: wi * dij and Distance', fontsize=16, y=0.92)
+
+    # Step 6: Plot boxplot for distances (same x-axis, just different y-values)
+    sns.boxplot(data=data_combined_distances, x="Cover type", y="value", showfliers=True, whis=1.5, ax=ax2)
+    ax2.set_title('Comparison of Distances between Solutions of Covers Models (Cinema p = 192)')
+    ax2.set_ylabel('Distance (dij)')
+    ax2.set_ylim(0, None)  # Adjust y-limits if needed
+
+    # Step 7: Adjust the layout and show the plot
+    plt.tight_layout()
+    plt.show()
+
+
+
 # File paths
 # sol_file = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton.txt'
 sol_file = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP.txt'
@@ -346,54 +422,63 @@ dist_file = '/home/falbuquerque/Documents/projects/GeoAvignon/PMPSolver/data/PAC
 
 
 # File paths for both solutions
-sol_file_1 = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton.txt'
-sol_file_2 = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP.txt'
+sol_file_1 = 'data/solutions_service_cinema/test_paca_cinema_p_192_EXACT_CPMP.txt'
+sol_file_2 = 'data/solutions_service_cinema/test_paca_cinema_EPCI_p_192_EXACT_CPMP_cover_EPCI.txt'
+sol_file_3 = 'data/solutions_service_cinema/test_paca_cinema_canton_p_192_EXACT_CPMP_cover_canton.txt'
+sol_file_4 = 'data/solutions_service_cinema/test_paca_cinema_commune_p_192_EXACT_CPMP_cover_commune.txt'
 dist_file = '/home/falbuquerque/Documents/projects/GeoAvignon/PMPSolver/data/PACA_jul24/dist_matrix_minutes_2037.txt'  # Ensure to use the correct distance file
 
 # Step 1: Parse both solution files
 assignments_df_1 = parse_customer_assignments(sol_file_1)
 assignments_df_2 = parse_customer_assignments(sol_file_2)
+assignments_df_3 = parse_customer_assignments(sol_file_3)
+assignments_df_4 = parse_customer_assignments(sol_file_4)
 distances_df = parse_distances(dist_file)
 
 # Step 2: Calculate weighted distances for both datasets
 merged_df_1 = calculate_weights(assignments_df_1, distances_df)
 merged_df_2 = calculate_weights(assignments_df_2, distances_df)
-
-# indentify the outliers
-# print(merged_df_1[merged_df_1['wi_dij'] > 3600])
-# print(merged_df_2[merged_df_2['wi_dij'] > 3600])
-# exit()
+merged_df_3 = calculate_weights(assignments_df_3, distances_df)
+merged_df_4 = calculate_weights(assignments_df_4, distances_df)
 
 
-# merged_df_1 = calculate_distances_unweighted(assignments_df_1, distances_df)
-# merged_df_2 = calculate_distances_unweighted(assignments_df_2, distances_df)
+# Example usage (assuming wi_dij and distance values are from your merged DataFrames):
+# plot_outliers_boxplot_and_line(
+#     merged_df_1['wi_dij'], merged_df_2['wi_dij'], merged_df_3['wi_dij'], merged_df_4['wi_dij'],
+#     merged_df_1['distance'], merged_df_2['distance'], merged_df_3['distance'], merged_df_4['distance']
+# )
 
-print(merged_df_1[merged_df_1['distance'] > 3600])
-print(merged_df_2[merged_df_2['distance'] > 3600])
+
+plot_distance_outliers_scatter(merged_df_1['distance'], merged_df_2['distance'], merged_df_3['distance'], merged_df_4['distance'], threshold=3600)
+
 exit()
 
+
+print(merged_df_1.head())
 
 
 # Extract the wi * dij values for comparison
 wi_dij_1 = merged_df_1['wi_dij']
 wi_dij_2 = merged_df_2['wi_dij']
+wi_dij_3 = merged_df_3['wi_dij']
+wi_dij_4 = merged_df_4['wi_dij']
+
+
+print(wi_dij_1.head())
+exit()
+
 
 
 # Step 3: Plot the combined distributions
 # plot_combined_distribution(wi_dij_1, wi_dij_2, 'Solution 1', 'Solution 2')
-
 # compare_distributions(wi_dij_1, wi_dij_2)
-
 # plot_distributions_step(wi_dij_1, wi_dij_2)
 # plot_distributions_hist(wi_dij_1, wi_dij_2)
 # plot_distributions_kde(wi_dij_1, wi_dij_2)
-
 # plot_distributions_kde_intervals(wi_dij_1, wi_dij_2)    
-
-
 # plot_distributions_log(wi_dij_1, wi_dij_2)  
 
-# plot_outliers_boxplot(wi_dij_1, wi_dij_2)
+plot_outliers_boxplot(wi_dij_1, wi_dij_2)
 
 # plot_outliers_violin(wi_dij_1, wi_dij_2)
 

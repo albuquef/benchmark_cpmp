@@ -457,9 +457,12 @@ def main():
     center_lon = df['longitude'].mean()
     
     global model_type 
-
     model_type = 'Real BPE23'
     # model_type = 'Cover Commune'  # 'Cover Arrond', 'Cover EPCI', 'Cover Canton', 'Cover Commune'
+    global decoupage_type
+    decoupage_type = 'commune' # 'Arrondissement', 'EPCI', 'canton', 'commune'
+
+
 
     if model_type == 'Real BPE23':
         data_service_path = 'data/solutions_service_cinema/points_BPE23_F303_paca_table.csv'
@@ -485,14 +488,7 @@ def main():
     # shapefile_paca = '/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/PACA_region_polygon.shp'
     shapefile_paca = '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/PACA_region.shp'
 
-    global decoupage_type
-    decoupage_type = 'canton' # 'Arrondissement', 'EPCI', 'canton', 'commune'
-
     shapefile_regions = f'/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/{decoupage_type}.shp'
-    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/Arrondissement.shp'  # Replace with actual path to your regions shapefile
-    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PAeCA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/EPCI.shp'
-    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/canton.shp'
-    # shapefile_regions = f'/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Decoupages_GIS/commune.shp'
 
     # Load shapefiles
     global region_gdf_paca
