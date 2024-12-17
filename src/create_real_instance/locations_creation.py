@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 from scipy.spatial import Voronoi, cKDTree
-from geovoronoi import voronoi_regions_from_coords, points_to_region
-import osmnx as ox
+# from geovoronoi import voronoi_regions_from_coords, points_to_region
+# import osmnx as ox
 
-
-
+GRID_TYPE = '2km'
+DIR_OUTPUTS = f'outputs/PACA_{GRID_TYPE}'
 
 def check_crs_consistency(gdf1, gdf2):
     if gdf1.crs != gdf2.crs:
@@ -33,7 +33,7 @@ def load_population_data(filepath):
     df['easting'], df['northing'] = zip(*df['idcar_1km'].apply(extract_coordinates))
     df = df.dropna(subset=['easting', 'northing'])
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['easting'], df['northing']))
-    gdf.set_crs(epsg=3395, allow_override=True)
+    gdf.set_crs(epsg=3035, allow_override=True)
     return gdf
 
 def filter_by_type_equipment(df, type_equipment):
@@ -41,10 +41,13 @@ def filter_by_type_equipment(df, type_equipment):
 
 def load_service_points_data(filepath, type_equipment):
     """Loads grid data and converts CRS."""
-    df = pd.read_csv(filepath, low_memory=False)
+    # df = pd.read_csv(filepath, low_memory=False)
+    df = pd.read_csv(filepath, low_memory=False, sep=',')
     # df = pd.read_csv(filepath)
+    print(f'Number of service points: {len(df)}')
     df = filter_by_type_equipment(df, type_equipment)
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['LAMBERT_X'], df['LAMBERT_Y']), crs='IGNF:RGF93LAMB93') # coordinates in LAMB93
+    # gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['LAMBERT_X'], df['LAMBERT_Y']), crs='IGNF:RGF93LAMB93') # coordinates in LAMB93
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['coord_x'], df['coord_y']), crs='IGNF:RGF93LAMB93') # coordinates in LAMB93
     gdf = gdf.to_crs(epsg=3035) # Convert to EPSG:3035
     return gdf
 
@@ -99,6 +102,9 @@ def create_voronoi(gdf_population, gdf_service, delta=10000):
     return voronoi_gdf
 
 def count_points_in_voronoi_polygons(gdf_population, voronoi_gdf):
+
+    print('Counting points in Voronoi polygons...')
+
     sum_points = 0
     sum_weight = 0
     cap_polygons = []
@@ -121,7 +127,7 @@ def count_points_in_voronoi_polygons(gdf_population, voronoi_gdf):
     
     # save cap_polygons in a file
     count = 1
-    with open('outputs/PACA_Jun2024/cap_polygons_voronoi_Jun2024.txt', 'w') as f:
+    with open(f'outputs/PACA_{GRID_TYPE}/cap_polygons_voronoi_cinema_{GRID_TYPE}_{SERV_CODE}.txt', 'w') as f:
         # firs line : columns names polygon cap_polygon
         for item in cap_polygons:
             f.write(f"{count} {item}\n")
@@ -178,19 +184,31 @@ def plot_buffer_regions(gdf_population, buffer_gdf, gdf_service):
     plt.show()
 
 def save_txt_table(filename, vet_cap, df_cust):
+
+    print(f"[INFO] Saving final table instance in {filename}...")
+    #compare sizes
+    print(f'Number of customers: {len(df_cust)}')
+    print(f'Number of capacities: {len(vet_cap)}')
+    # print total capacity
+    print(f'Total capacity: {sum(vet_cap)}')
+    # min max mean  
+    print(f'Min capacity: {min(vet_cap)}')
+    print(f'Max capacity: {max(vet_cap)}')
+    print(f'Mean capacity: {np.mean(vet_cap)}')
+
     cont = 1
     with open(filename, 'w') as f:
         # first line with the columns names
-        f.write("customer weight coord_x coord_y id_grid5km fid\n")
+        f.write(f"customer weight coord_x coord_y id_grid{GRID_TYPE} fid\n")
         for idx, row in df_cust.iterrows():
             f.write(f"{cont} {vet_cap[cont-1]} {row['coord_x']} {row['coord_y']} {idx} {row['fid']}\n")
             cont += 1
         cont = 1
 
 def create_final_table_locations(cap_polygons):
-    filename_1 = 'outputs/PACA_Jun2024/loc_capacities_1_Jun2024.txt'
-    filename_2 = 'outputs/PACA_Jun2024/loc_capacities_2_Jun2024.txt'
-    df_cust = pd.read_csv('outputs/PACA_Jun2024/cust_weights_Jun2024.txt', sep=' ')   
+    # filename_1 = f'{DIR_OUTPUTS}/loc_capacities_1.txt'
+    filename_2 = f'{DIR_OUTPUTS}/loc_capacities_{SERV_CODE}.txt'
+    df_cust = pd.read_csv(f'{DIR_OUTPUTS}/cust_weights_{GRID_TYPE}.txt', sep=' ')   
     cap_polygons = np.array(cap_polygons)
     unique_cap_polygons = np.unique(cap_polygons)
     # eliminate values less than 0
@@ -204,7 +222,7 @@ def create_final_table_locations(cap_polygons):
     np.random.seed(42)
     
     print('-' * 50)
-    print(f"[INFO] Creating final table instance in {filename_1}...")
+    # print(f"[INFO] Creating final table instance in {filename_1}...")
     print(f"[INFO] Creating final table instance in {filename_2}...")
     
     plot_hist = True
@@ -305,31 +323,49 @@ def create_final_table_locations(cap_polygons):
 
 
   
-    save_txt_table(filename_1, vec_capacities_equals_prob, df_cust)
+    # save_txt_table(filename_1, vec_capacities_equals_prob, df_cust)
     save_txt_table(filename_2, vec_capacities_proporcional_prob, df_cust)
+
+
     print('-' * 50)
     
     
 # Load population data
-gdf_population = load_population_data('data/data_qgis/data_instance_paca/points_population_1km_paca_table.csv')
+print('Loading population data...')
+gdf_population = load_population_data('/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Population/pop_1km_2019/points_population2019_paca_1km_wihtout_islands_table.csv')
 # # Load service points data
 # gdf_service = load_service_points_data('data/data_qgis/data_instance_paca/bpe21_sport_loisir_xy_paca_table.csv', 'D106')
-gdf_service = load_service_points_data('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/BPE23.csv', 'D106')
+# gdf_service = load_service_points_data('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/BPE23.csv', 'F303')
+print(f'Number of population points: {len(gdf_population)}')
+
+print('Loading service points data...')
+# F303:cinema, F113: terrain des grand jeux, D106: urgence
+SERV_CODE = 'F113'
+print(f'Service code: {SERV_CODE}')
+gdf_service = load_service_points_data(f'/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Services/filtered/points_BPE23_{SERV_CODE}_paca_table.csv', SERV_CODE)
 # plot_population_and_service_points(gdf_population, gdf_service)
+
+# check if gdf_service have repeated points (same coordinates)
+print(f'Number of service points: {len(gdf_service)}')
+gdf_service = gdf_service.drop_duplicates(subset=['coord_x', 'coord_y'])
+print(f'Number of service points after drop duplicates: {len(gdf_service)}')
+
 
 # create_voronoi(gdf_population, gdf_service, delta=10000) # not covering all services points
 # read a polygon shapefile as a GeoDataFrame
-gdf_voronoi = gpd.read_file('/home/felipe/Documents/Projects/GeoAvigon/create_instance_PACA/Create_data_PACA/Create_data_PACA/Creation_Real_Instance/Services/Voronoi_Polygons/polygon_voronoi_BPE23_D106_paca.shp')
+print('Loading Voronoi polygons...')
+gdf_voronoi = gpd.read_file(f'/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Services/Voronoi_Polygons/polygon_voronoi_BPE23_{SERV_CODE}_paca.shp')
 gdf_voronoi = gdf_voronoi.to_crs(epsg=3035)
 
 # # plotting
 plot_voronoi_polygons(gdf_population, gdf_voronoi, gdf_service, delta=10000)
 # compare sizes
-print(len(gdf_voronoi))
-print(len(gdf_service))
+print(f'Number of voronoi regions: {len(gdf_voronoi)}')
+print(f'Number of service points: {len(gdf_service)}')
+
 
 cap_polygons = count_points_in_voronoi_polygons(gdf_population, gdf_voronoi)
-cap_polygons = load_cap_polygons('outputs/PACA_Jun2024/cap_polygons_voronoi_urgenc_Jul2024.txt')
+# cap_polygons = load_cap_polygons('outputs/cap_polygons_voronoi_cinema_3km.txt')
 create_final_table_locations(cap_polygons)
 
 
