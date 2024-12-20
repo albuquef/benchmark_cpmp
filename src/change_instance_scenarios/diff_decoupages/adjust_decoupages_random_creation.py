@@ -87,22 +87,27 @@ def filter_and_save_subareas(shapefile_paths, points_gdfs):
 
 # Example usage
 shapefiles = [
-    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_voronoi/voronoi_Arrondisement.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_50.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_voronoi/voronoi_commune_2km.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_voronoi/voronoi_canton_2km.shp',
     '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_voronoi/voronoi_EPCI.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_188.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_192.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_978.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1041.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1058.shp',
-    'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1133.shp'
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_voronoi/voronoi_Arrondissement.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_grid/grid_commune_2km.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_grid/grid_canton_2km.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_grid/grid_EPCI.shp',
+    '/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Decoupages_GIS/decoupages_grid/grid_Arrondissement.shp'
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_188.shp',
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_192.shp',
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_978.shp',
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1041.shp',
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1058.shp',
+    # 'outputs/decoupages_voronoi/PACA_subdivisions_voronoi_1133.shp'
 ]
 
 points = [
-    gpd.read_file("/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Population/grid_2km/grid_paca_points_2km.shp").to_crs(epsg=3395),
-    gpd.read_file("/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Population/grid_5km/points_5km_2037_paca.shp").to_crs(epsg=3395)
+    gpd.read_file("/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Population/grid_points_population/grid_2km/grid_2km_final/grid_paca_points_2km_final.shp").to_crs(epsg=3395),
+    # gpd.read_file("/home/falbuquerque/Documents/projects/GeoAvignon/Creation_Real_Instance/Population/grid_5km/points_5km_2037_paca.shp").to_crs(epsg=3395)
 ]
 
 count_subareas_per_points_file(shapefiles, points)
 
-filter_and_save_subareas(shapefiles, points)
+# filter_and_save_subareas(shapefiles, points)
